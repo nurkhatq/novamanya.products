@@ -389,6 +389,36 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .le-user.dias{color:#7950f2}.le-user.adil{color:#e67700}
 .le-txt{color:var(--txt2);line-height:1.4}
 .log-empty{text-align:center;color:var(--gry);padding:32px;font-size:.85rem}
+
+/* ══ REMOVE DUP ACTION MODAL ════════════════════════════════════ */
+.rda-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2600;display:none;align-items:center;justify-content:center}
+.rda-ov.show{display:flex}
+.rda-box{background:#fff;border-radius:16px;width:480px;max-width:95vw;box-shadow:var(--sh2);overflow:hidden}
+.rda-hd{padding:14px 18px 10px;border-bottom:1px solid var(--brd)}
+.rda-hd b{display:block;font-size:.88rem;color:var(--txt);line-height:1.4}
+.rda-sku{font-family:monospace;font-size:.72rem;color:var(--gry)}
+.rda-q{padding:12px 18px 8px;font-size:.82rem;color:var(--gry);font-weight:600}
+.rda-btns{display:flex;flex-direction:column;gap:6px;padding:0 18px 14px}
+.rda-btn{padding:10px 14px;border-radius:10px;border:none;cursor:pointer;font-size:.84rem;font-weight:600;text-align:left;transition:all .15s}
+.rda-reassign{background:#e7f5ff;color:#1971c2}.rda-reassign:hover{background:#d0ebff}
+.rda-standalone{background:var(--grn-bg);color:var(--grn)}.rda-standalone:hover{background:#b2f2bb}
+.rda-delete{background:#fff5f5;color:var(--acc)}.rda-delete:hover{background:#ffe3e3}
+.rda-cancel{background:var(--gry-bg);color:var(--gry)}.rda-cancel:hover{background:#dee2e6}
+.rda-search{padding:0 18px 16px;border-top:1px solid var(--brd)}
+.rda-search-label{font-size:.76rem;font-weight:700;color:var(--gry);padding:10px 0 6px}
+.rda-inp{width:100%;padding:8px 12px;border:1.5px solid var(--brd);border-radius:9px;font-size:.84rem;outline:none}
+.rda-inp:focus{border-color:var(--blue)}
+.rda-results{margin-top:6px;max-height:220px;overflow-y:auto;border:1px solid var(--brd);border-radius:9px}
+.rda-item{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--brd);transition:background .1s}
+.rda-item:last-child{border-bottom:none}
+.rda-item:hover{background:#f0f4f8}
+.rda-item-sku{font-family:monospace;font-size:.7rem;color:var(--gry);margin-bottom:2px}
+.rda-item-title{font-size:.8rem;color:var(--txt);font-weight:500}
+.rda-empty{padding:14px;text-align:center;color:var(--gry);font-size:.8rem}
+
+/* ══ BARCODE + NAME_DUP BANNER ══════════════════════════════════ */
+.sku-bar{background:#f3f0ff;color:#7950f2}
+.nd-banner{background:#fff3bf;border:1.5px solid #f6d860;border-radius:var(--r);padding:10px 16px;margin-bottom:12px;font-size:.8rem;color:#92660a;line-height:1.5}
 </style>
 </head>
 <body>
@@ -406,18 +436,30 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
   </div>
 </div>
 
-<!-- ══ REVIEW OVERLAY ══ -->
-<div class="rev-ov" id="revOv">
-  <div class="rev-hd">
-    <h2>Проверка дублей по названию МС</h2>
-    <span class="rev-prog" id="revProg"></span>
-    <button class="rev-close" onclick="closeReview()">Закрыть</button>
+<!-- ══ REMOVE DUP ACTION MODAL ══ -->
+<div class="rda-ov" id="rdaOv" onclick="if(event.target===this)closeRda()">
+  <div class="rda-box">
+    <div class="rda-hd">
+      <b id="rdaTitle"></b>
+      <span class="rda-sku" id="rdaSku"></span>
+    </div>
+    <div class="rda-q">Что сделать с этим товаром?</div>
+    <div class="rda-btns">
+      <button class="rda-btn rda-reassign" onclick="rdaChoose('reassign')">Присвоить другому товару</button>
+      <button class="rda-btn rda-standalone" onclick="rdaChoose('standalone')">Сделать главным товаром</button>
+      <button class="rda-btn rda-delete" onclick="rdaChoose('delete')">Удалить из базы</button>
+      <button class="rda-btn rda-cancel" onclick="closeRda()">Отмена</button>
+    </div>
+    <div class="rda-search" id="rdaSearch" style="display:none">
+      <div class="rda-search-label">Найти товар для присвоения:</div>
+      <input class="rda-inp" id="rdaInp" type="text" placeholder="Название или SKU..." oninput="rdaSearchItems(this.value)" onclick="event.stopPropagation()">
+      <div class="rda-results" id="rdaResults"></div>
+    </div>
   </div>
-  <div class="rev-body" id="revBody"></div>
 </div>
 
 <!-- ══ CHANGE LOG MODAL ══ -->
-<div class="log-ov" id="logOv">
+<div class="log-ov" id="logOv" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="log-box">
     <div class="log-hd">
       <h3>Лог изменений</h3>
@@ -443,7 +485,6 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
     </div>
     <div class="user-bar" id="userBar" style="display:none">
       <span class="u-name" id="uName"></span>
-      <button class="u-btn accent" onclick="openReview()">Проверка дублей</button>
       <button class="u-btn accent" onclick="openLog()">Лог</button>
       <button class="u-btn danger" onclick="doLogout()">Выйти</button>
     </div>
@@ -502,6 +543,9 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 
 <!-- ══ MAIN ══ -->
 <main>
+  <div class="nd-banner" id="ndBanner" style="display:none">
+    <b>Раздел: дубли по названию МС</b> — здесь товары, объединённые автоматически по совпадению названия в МойСклад. Проверьте каждую карточку через «Ред.» и уберите неверные связи.
+  </div>
   <div class="rinfo" id="rinfo"></div>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none"><div class="ico"></div><h3>Ничего не найдено</h3></div>
@@ -547,7 +591,7 @@ function saveOvs(o){localStorage.setItem('nm_ovs',JSON.stringify(o))}
 function applyOvs(data){
   const o=getOvs();
   if(!Object.keys(o).length) return data;
-  return data.map(r=>{
+  return data.filter(r=>!o[r.main_sku]?.deleted).map(r=>{
     const ov=o[r.main_sku];if(!ov) return r;
     const p={...r,dop_skus:[...(r.dop_skus||[])],dop_articles:[...(r.dop_articles||[])],flags:[...(r.flags||[])]};
     if(ov.rmDops){
@@ -562,16 +606,87 @@ function applyOvs(data){
   });
 }
 
-function removeDop(mainSku,dopSku){
+function _rmDopRaw(mainSku,dopSku){
   const o=getOvs();
   if(!o[mainSku]) o[mainSku]={};
   if(!o[mainSku].rmDops) o[mainSku].rmDops=[];
   if(!o[mainSku].rmDops.includes(dopSku)) o[mainSku].rmDops.push(dopSku);
-  // also remove from addDops if it was manually added
   if(o[mainSku].addDops) o[mainSku].addDops=o[mainSku].addDops.filter(s=>s!==dopSku);
   saveOvs(o);
-  addLog('rm_dup',mainSku,`Убран дубль ${dopSku} из ${mainSku}`);
-  apply();
+}
+
+// ── Remove-dup action modal ───────────────────────────────────────
+let _rdaState={mainSku:'',dopSku:''};
+
+function openRmDupModal(mainSku,dopSku){
+  _rdaState={mainSku,dopSku};
+  const rec=DATA.find(r=>r.main_sku===dopSku);
+  const title=(rec?.catalog_info?.title||rec?.name||dopSku).slice(0,70);
+  document.getElementById('rdaTitle').textContent=title;
+  document.getElementById('rdaSku').textContent=dopSku;
+  document.getElementById('rdaSearch').style.display='none';
+  document.getElementById('rdaInp').value='';
+  document.getElementById('rdaResults').innerHTML='';
+  document.getElementById('rdaOv').classList.add('show');
+}
+function closeRda(){document.getElementById('rdaOv').classList.remove('show');}
+
+function rdaChoose(action){
+  const {mainSku,dopSku}=_rdaState;
+  if(action==='cancel'){closeRda();return;}
+  if(action==='standalone'){
+    _rmDopRaw(mainSku,dopSku);
+    addLog('standalone',dopSku,`${dopSku} стал главным товаром (убран из дублей ${mainSku})`);
+    closeRda();apply();
+  } else if(action==='delete'){
+    const o=getOvs();
+    if(!o[dopSku]) o[dopSku]={};
+    o[dopSku].deleted=true;
+    saveOvs(o);
+    _rmDopRaw(mainSku,dopSku);
+    addLog('delete',dopSku,`${dopSku} удалён из базы (был дублём ${mainSku})`);
+    closeRda();apply();
+  } else if(action==='reassign'){
+    document.getElementById('rdaSearch').style.display='block';
+    document.getElementById('rdaInp').focus();
+  }
+}
+
+function rdaSearchItems(q){
+  const res=document.getElementById('rdaResults');
+  if(!q||q.length<2){res.innerHTML='';return;}
+  const ql=q.toLowerCase();
+  const {mainSku,dopSku}=_rdaState;
+  const hits=applyOvs(DATA).filter(r=>{
+    if(r.main_sku===mainSku||r.main_sku===dopSku) return false;
+    const t=(r.catalog_info?.title||r.name||'').toLowerCase();
+    return t.includes(ql)||r.main_sku?.includes(ql);
+  }).slice(0,10);
+  if(!hits.length){res.innerHTML='<div class="rda-empty">Не найдено</div>';return;}
+  res.innerHTML=hits.map(r=>`<div class="rda-item" onclick="rdaReassign('${r.main_sku}')">
+    <div class="rda-item-sku">${r.main_sku}</div>
+    <div class="rda-item-title">${(r.catalog_info?.title||r.name||'').slice(0,65)}</div>
+  </div>`).join('');
+}
+
+function rdaReassign(targetSku){
+  const {mainSku,dopSku}=_rdaState;
+  _rmDopRaw(mainSku,dopSku);
+  // add to target
+  const o=getOvs();
+  if(!o[targetSku]) o[targetSku]={};
+  if(!o[targetSku].addDops) o[targetSku].addDops=[];
+  if(!o[targetSku].addDops.includes(dopSku)) o[targetSku].addDops.push(dopSku);
+  if(o[targetSku].rmDops) o[targetSku].rmDops=o[targetSku].rmDops.filter(s=>s!==dopSku);
+  saveOvs(o);
+  const tr=DATA.find(r=>r.main_sku===targetSku);
+  const tname=(tr?.catalog_info?.title||tr?.name||targetSku).slice(0,40);
+  addLog('reassign',dopSku,`${dopSku} → переназначен как дубль «${tname}» (${targetSku})`);
+  closeRda();apply();
+}
+
+function removeDop(mainSku,dopSku){
+  openRmDupModal(mainSku,dopSku);
 }
 
 function addDop(mainSku,dopSku){
@@ -625,89 +740,6 @@ function exportLog(){
   a.click();
 }
 
-// ══ REVIEW MODE (name_dup) ════════════════════════════════════════
-const reviewDecisions={};
-
-function openReview(){
-  const working=applyOvs(DATA);
-  const pairs=[];
-  const seen=new Set();
-  working.forEach(r=>{
-    if(!r.flags?.includes('name_dup')) return;
-    r.dop_skus.forEach(dsku=>{
-      const key=[r.main_sku,dsku].sort().join('|');
-      if(seen.has(key)) return; seen.add(key);
-      const other=working.find(x=>x.main_sku===dsku);
-      pairs.push({a:r, b:other||{main_sku:dsku,name:dsku}, key});
-    });
-  });
-
-  const done=Object.keys(reviewDecisions).length;
-  document.getElementById('revProg').textContent=`Проверено: ${done} / ${pairs.length}`;
-
-  const body=document.getElementById('revBody');
-  body.innerHTML=pairs.map((p,i)=>{
-    const dec=reviewDecisions[p.key];
-    const ci=x=>(x.catalog_info||{});
-    const card=x=>`<div class="rp-cell">
-      <div class="rp-cell-title">${ci(x).title||x.name||'—'}</div>
-      <div class="rp-cell-sku">${x.main_sku}</div>
-      <div class="rp-cell-meta">
-        ${ci(x).price?'<span>💰 '+ci(x).price.toLocaleString('ru')+' ₸</span>':''}
-        ${ci(x).stock!=null?'<span> '+ci(x).stock+'</span>':''}
-        ${ci(x).status?'<span>'+ci(x).status+'</span>':''}
-      </div>
-    </div>`;
-    return`<div class="rp" id="rp${i}">
-      <div class="rp-head"><span>Пара #${i+1} · <b>${p.a.name||p.a.main_sku}</b></span></div>
-      <div class="rp-grid">${card(p.a)}${card(p.b)}</div>
-      <div class="rp-foot">
-        <span class="rp-verdict${dec?(' '+(dec==='yes'?'yes':'no')):''}">
-          ${dec==='yes'?'Подтверждён как дубль':dec==='no'?'Не дубль — связь убрана':''}
-        </span>
-        <button class="rpb rpb-ok${dec==='yes'?' on':''}" onclick="reviewDecide('${p.key}','${p.a.main_sku}','${p.b.main_sku}','yes',${i})">Дубль</button>
-        <button class="rpb rpb-no${dec==='no'?' on':''}" onclick="reviewDecide('${p.key}','${p.a.main_sku}','${p.b.main_sku}','no',${i})">Не дубль</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('revOv').classList.add('show');
-}
-
-function reviewDecide(key,skuA,skuB,verdict,idx){
-  reviewDecisions[key]=verdict;
-  if(verdict==='no'){
-    // Remove the name_dup link from both sides
-    removeDopSilent(skuA,skuB);
-    removeDopSilent(skuB,skuA);
-    addLog('review_no',skuA,`Отклонён дубль по имени: ${skuA} ↔ ${skuB}`);
-  } else {
-    addLog('review_yes',skuA,`Подтверждён дубль по имени: ${skuA} ↔ ${skuB}`);
-  }
-  // Update UI in review panel
-  const panel=document.getElementById('rp'+idx);
-  if(panel){
-    const v=panel.querySelector('.rp-verdict');
-    if(v){v.className='rp-verdict '+(verdict==='yes'?'yes':'no');v.textContent=verdict==='yes'?'Подтверждён как дубль':'Не дубль — связь убрана';}
-    panel.querySelectorAll('.rpb-ok').forEach(b=>b.classList.toggle('on',verdict==='yes'));
-    panel.querySelectorAll('.rpb-no').forEach(b=>b.classList.toggle('on',verdict==='no'));
-  }
-  const done=Object.keys(reviewDecisions).length;
-  document.getElementById('revProg').textContent=`Проверено: ${done} / ${document.querySelectorAll('.rp').length}`;
-}
-
-function removeDopSilent(mainSku,dopSku){
-  const o=getOvs();
-  if(!o[mainSku]) o[mainSku]={};
-  if(!o[mainSku].rmDops) o[mainSku].rmDops=[];
-  if(!o[mainSku].rmDops.includes(dopSku)) o[mainSku].rmDops.push(dopSku);
-  saveOvs(o);
-}
-
-function closeReview(){
-  document.getElementById('revOv').classList.remove('show');
-  apply();
-}
 
 // ══ CARD EDIT TOGGLE ═════════════════════════════════════════════
 function toggleEdit(e,sku){
@@ -882,6 +914,7 @@ function apply(){
   if(fBrand) parts.push('Бренд: '+fBrand);
   if(fCat)   parts.push('Категория: '+fCat);
   document.getElementById('rinfo').textContent=`Показано: ${filtered.length} из ${DATA.length}${parts.length?' · '+parts.join(' · '):''}`;
+  document.getElementById('ndBanner').style.display=(fFilter==='name_dup')?'block':'none';
   render();
 }
 
@@ -930,6 +963,7 @@ function buildCard(item,idx){
 
   const price=cat.price?`<span class="price">${cat.price.toLocaleString('ru')} ₸</span>`:'';
   const stock=cat.stock!=null?`<span class="mstock"> ${cat.stock} шт.</span>`:'';
+  const barcode=item.ms_barcode||cat.barcode||'';
   const dopCount=item.dop_skus?.length||0;
   const compTxt=item.comp_count!=null?` · Комп: <b>${item.comp_count}</b>`:'';
   const kaspiBtn=shopLink?`<a class="klink" href="${shopLink}" target="_blank" onclick="event.stopPropagation()">Kaspi →</a>`:'';
@@ -941,7 +975,7 @@ function buildCard(item,idx){
       <div class="ep-ttl">Редактирование дублей</div>
       ${(item.dop_skus||[]).map(s=>`<div class="ep-dop">
         <span class="ep-dop-sku">${s}</span>
-        <button class="ep-rm-btn" onclick="event.stopPropagation();removeDop('${item.main_sku}','${s}')">Убрать</button>
+        <button class="ep-rm-btn" onclick="event.stopPropagation();openRmDupModal('${item.main_sku}','${s}')">Убрать</button>
       </div>`).join('')}
       <div class="ep-add-row">
         <input class="ep-add-inp" id="epinp${idx}" type="text" placeholder="SKU для добавления" onclick="event.stopPropagation()">
@@ -959,6 +993,7 @@ function buildCard(item,idx){
       <div class="cb-skus">
         ${item.main_sku?`<span class="sku sku-main">${item.main_sku}</span>`:''}
         ${item.article?`<span class="sku sku-art">Арт: ${item.article}</span>`:''}
+        ${barcode?`<span class="sku sku-bar">ШК: ${barcode}</span>`:''}
       </div>
       ${fhtml.length?`<div class="cb-flags">${fhtml.join('')}</div>`:''}
     </div>
