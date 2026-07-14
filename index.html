@@ -278,6 +278,13 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .db-s{background:var(--blue-bg);color:var(--blue)}
 .dl{font-size:.63rem;color:#457b9d;text-decoration:none}
 .dl:hover{text-decoration:underline}
+.di-rm-btn{flex-shrink:0;align-self:center;padding:4px 10px;border-radius:8px;border:1px solid #fca5a5;background:none;color:var(--acc);font-size:.7rem;font-weight:700;cursor:pointer;margin-left:6px}
+.di-rm-btn:hover{background:var(--acc);color:#fff}
+.dp-add-row{display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--brd)}
+.dp-add-inp{flex:1;padding:6px 10px;border:1.5px solid var(--brd);border-radius:8px;font-size:.8rem;outline:none}
+.dp-add-inp:focus{border-color:var(--blue)}
+.dp-add-btn{padding:6px 12px;border-radius:8px;background:var(--grn-bg);color:var(--grn);border:none;cursor:pointer;font-size:.78rem;font-weight:700;white-space:nowrap}
+.dp-add-btn:hover{background:var(--grn);color:#fff}
 .comp-blk{background:var(--pur-bg);border-radius:var(--rs);padding:8px 10px;margin-bottom:8px}
 .comp-blk-t{font-size:.7rem;font-weight:700;color:var(--pur);margin-bottom:4px}
 .comp-blk-i{font-size:.76rem;color:var(--txt2);padding:1px 0}
@@ -963,26 +970,12 @@ function buildCard(item,idx){
 
   const price=cat.price?`<span class="price">${cat.price.toLocaleString('ru')} ₸</span>`:'';
   const stock=cat.stock!=null?`<span class="mstock"> ${cat.stock} шт.</span>`:'';
-  const barcode=item.ms_barcode||cat.barcode||'';
+  const _bc=b=>b&&!b.startsWith('02')&&b!=='0'?b:'';
+  const barcode=_bc(item.ms_barcode)||_bc(cat.barcode)||'';
   const dopCount=item.dop_skus?.length||0;
   const compTxt=item.comp_count!=null?` · Комп: <b>${item.comp_count}</b>`:'';
   const kaspiBtn=shopLink?`<a class="klink" href="${shopLink}" target="_blank" onclick="event.stopPropagation()">Kaspi →</a>`:'';
   const expBtn=canExp?`<button class="exp-btn" onclick="tog(event,${idx})">Дубли <svg class="exp-ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>`:'';
-  const editBtn=currentUser&&item.main_sku?`<button class="card-edit-btn" onclick="toggleEdit(event,'${item.main_sku}')">Ред.</button>`:'';
-
-  const editPanel=currentUser&&item.main_sku?`
-    <div class="ep">
-      <div class="ep-ttl">Редактирование дублей</div>
-      ${(item.dop_skus||[]).map(s=>`<div class="ep-dop">
-        <span class="ep-dop-sku">${s}</span>
-        <button class="ep-rm-btn" onclick="event.stopPropagation();openRmDupModal('${item.main_sku}','${s}')">Убрать</button>
-      </div>`).join('')}
-      <div class="ep-add-row">
-        <input class="ep-add-inp" id="epinp${idx}" type="text" placeholder="SKU для добавления" onclick="event.stopPropagation()">
-        <button class="ep-add-btn" onclick="event.stopPropagation();addDop('${item.main_sku}',document.getElementById('epinp${idx}').value)">+ Добавить</button>
-      </div>
-      ${flags.includes('name_dup')?`<div style="margin-top:6px"><button class="rpb rpb-no" style="font-size:.72rem" onclick="event.stopPropagation();removeFlag('${item.main_sku}','name_dup')">Снять флаг name_dup</button></div>`:''}
-    </div>`:'';
 
   card.innerHTML=`
     ${phHtml}
@@ -999,9 +992,8 @@ function buildCard(item,idx){
     </div>
     <div class="cf">
       <div class="cf-left">Дублей: <b>${dopCount}</b>${compTxt}</div>
-      <div class="cf-right">${kaspiBtn}${editBtn}${expBtn}</div>
+      <div class="cf-right">${kaspiBtn}${expBtn}</div>
     </div>
-    ${editPanel}
     ${canExp?`<div class="dp" id="dp${idx}"><div class="dp-inner">${buildDp(item)}</div></div>`:''}`;
 
   if(photos.length>1){
@@ -1026,27 +1018,32 @@ function tyBadge(item){
 function buildDp(item){
   let html='';
   if(item.ms_type==='Комплект'&&item.components?.length){
-    html+=`<div class="comp-blk"><div class="comp-blk-t"> Компоненты (${item.comp_count})</div>${item.components.map(c=>`<div class="comp-blk-i">• ${c}</div>`).join('')}</div>`;
+    html+=`<div class="comp-blk"><div class="comp-blk-t">Компоненты (${item.comp_count})</div>${item.components.map(c=>`<div class="comp-blk-i">• ${c}</div>`).join('')}</div>`;
   }
-  if(!item.dop_skus?.length) return html||'<p style="color:var(--gry);font-size:.78rem">Нет доп. артикулов</p>';
-  html+=`<div class="dp-title"> Дублирующие карточки (${item.dop_skus.length})</div><div class="dp-list">`;
+  const addBlock=currentUser?`<div class="dp-add-row">
+    <input class="dp-add-inp" id="dpa_${item.main_sku}" type="text" placeholder="SKU дубля для добавления" onclick="event.stopPropagation()">
+    <button class="dp-add-btn" onclick="event.stopPropagation();addDop('${item.main_sku}',document.getElementById('dpa_${item.main_sku}').value)">+ Добавить</button>
+  </div>`:'';
+  if(!item.dop_skus?.length) return html+(addBlock||'<p style="color:var(--gry);font-size:.78rem">Нет доп. артикулов</p>');
+  html+=`<div class="dp-title">Дублирующие карточки (${item.dop_skus.length})</div><div class="dp-list">`;
   item.dop_articles.forEach(dop=>{
     const dc=dop.catalog_info||{};
     const dtitle=dc.title||dop.ms_name||dop.sku;
     const photo=dc.photos?.[0]||'';
     const dlink=dc.shopLink?KB+dc.shopLink:'';
     const st=dc.status||'';
-    const phEl=photo?`<img class="di-ph" src="${photo}" alt="" loading="lazy">`:`<div class="di-ph-ph"></div>`;
+    const phEl=photo?`<img class="di-ph" src="${photo}" alt="" loading="lazy">`:`<div class="di-ph-ph">—</div>`;
     const bgs=[];
     if(st==='active')        bgs.push(`<span class="dbadge db-a">Активный</span>`);
     else if(st==='inactive') bgs.push(`<span class="dbadge db-i">Неактивный</span>`);
     else                     bgs.push(`<span class="dbadge db-nc">Нет в Каспи</span>`);
     if(dc.price)    bgs.push(`<span class="dbadge db-p">${dc.price.toLocaleString('ru')} ₸</span>`);
-    if(dc.stock!=null) bgs.push(`<span class="dbadge db-s"> ${dc.stock}</span>`);
-    if(dlink) bgs.push(`<a class="dl" href="${dlink}" target="_blank" onclick="event.stopPropagation()">→</a>`);
-    html+=`<div class="di">${phEl}<div class="di-info"><div class="di-title">${dtitle}</div><div class="di-sku">${dop.sku}</div><div class="di-badges">${bgs.join('')}</div></div></div>`;
+    if(dc.stock!=null) bgs.push(`<span class="dbadge db-s">${dc.stock} шт.</span>`);
+    if(dlink) bgs.push(`<a class="dl" href="${dlink}" target="_blank" onclick="event.stopPropagation()">Kaspi →</a>`);
+    const rmBtn=currentUser?`<button class="di-rm-btn" onclick="event.stopPropagation();openRmDupModal('${item.main_sku}','${dop.sku}')">Убрать</button>`:'';
+    html+=`<div class="di">${phEl}<div class="di-info"><div class="di-title">${dtitle}</div><div class="di-sku">${dop.sku}</div><div class="di-badges">${bgs.join('')}</div></div>${rmBtn}</div>`;
   });
-  return html+'</div>';
+  return html+`</div>${addBlock}`;
 }
 
 function setPhoto(idx,photos,i){
