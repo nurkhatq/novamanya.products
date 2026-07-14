@@ -1079,6 +1079,21 @@ document.getElementById('sortSel').addEventListener('change',e=>{fSort=e.target.
 buildCarousel();
 apply();
 
+// Refresh data from server in background (VPS API)
+async function refreshFromServer(){
+  try{
+    const r=await fetch('/api/db');
+    if(!r.ok) return;
+    const fresh=await r.json();
+    if(fresh&&fresh.length){
+      DATA.length=0;
+      fresh.forEach(function(x){DATA.push(x);});
+      apply();
+    }
+  }catch(e){ /* server not available – keep embedded data */ }
+}
+setTimeout(refreshFromServer,200);
+
 // Auth init — restore session or show login
 if(checkSession()){
   document.getElementById('loginOv').style.display='none';
