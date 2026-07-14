@@ -394,6 +394,10 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .le-time{color:var(--gry);white-space:nowrap;min-width:120px;font-size:.7rem}
 .le-user{font-weight:800;min-width:40px}
 .le-user.dias{color:#7950f2}.le-user.adil{color:#e67700}
+.le-revert{background:#fff3e0;border:1px solid #ff9800;color:#e65100;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:.75rem;margin-left:6px;white-space:nowrap}
+.le-revert:hover{background:#ff9800;color:#fff}
+.le-reverted{font-size:.72rem;color:#aaa;margin-left:6px;font-style:italic}
+.le.reverted{opacity:.55}
 .le-txt{color:var(--txt2);line-height:1.4}
 .log-empty{text-align:center;color:var(--gry);padding:32px;font-size:.85rem}
 
@@ -592,34 +596,41 @@ document.getElementById('lPass').addEventListener('keydown',e=>{if(e.key==='Ente
 document.getElementById('lUser').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lPass').focus();});
 
 // ══ OVERRIDES (localStorage) ═══════════════════════════════════
-function getOvs(){try{return JSON.parse(localStorage.getItem('nm_ovs')||'{}')}catch{return{}}}
-function saveOvs(o){localStorage.setItem('nm_ovs',JSON.stringify(o))}
+// ── Server-backed persistence (replaces localStorage overrides) ───────
+// Data is served fresh by server.py on each page load. No local overrides needed.
+function applyOvs(data){ return data; }
 
-function applyOvs(data){
-  const o=getOvs();
-  if(!Object.keys(o).length) return data;
-  return data.filter(r=>!o[r.main_sku]?.deleted).map(r=>{
-    const ov=o[r.main_sku];if(!ov) return r;
-    const p={...r,dop_skus:[...(r.dop_skus||[])],dop_articles:[...(r.dop_articles||[])],flags:[...(r.flags||[])]};
-    if(ov.rmDops){
-      p.dop_skus=p.dop_skus.filter(s=>!ov.rmDops.includes(s));
-      p.dop_articles=p.dop_articles.filter(a=>!ov.rmDops.includes(a.sku));
-    }
-    if(ov.addDops){
-      ov.addDops.forEach(s=>{if(!p.dop_skus.includes(s)){p.dop_skus.push(s);p.dop_articles.push({sku:s,catalog_info:null});}});
-    }
-    if(ov.rmFlags) p.flags=p.flags.filter(f=>!ov.rmFlags.includes(f));
-    return p;
-  });
+async function apiAction(payload){
+  payload.user = currentUser || 'unknown';
+  try {
+    const r = await fetch('/api/action', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if(!r.ok){ alert('Ошибка сервера: '+(d.error||r.status)); return false; }
+    return true;
+  } catch(e) {
+    alert('Нет связи с сервером. Запустите server.py
+'+e);
+    return false;
+  }
 }
 
-function _rmDopRaw(mainSku,dopSku){
-  const o=getOvs();
-  if(!o[mainSku]) o[mainSku]={};
-  if(!o[mainSku].rmDops) o[mainSku].rmDops=[];
-  if(!o[mainSku].rmDops.includes(dopSku)) o[mainSku].rmDops.push(dopSku);
-  if(o[mainSku].addDops) o[mainSku].addDops=o[mainSku].addDops.filter(s=>s!==dopSku);
-  saveOvs(o);
+async function apiRevert(aid){
+  try {
+    const r = await fetch('/api/revert/'+aid, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user: currentUser||'unknown'})
+    });
+    const d = await r.json();
+    if(!r.ok){ alert('Ошибка: '+(d.error||r.status)); return false; }
+    return true;
+  } catch(e) {
+    alert('Нет связи с сервером: '+e); return false;
+  }
 }
 
 // ── Remove-dup action modal ───────────────────────────────────────
@@ -638,25 +649,17 @@ function openRmDupModal(mainSku,dopSku){
 }
 function closeRda(){document.getElementById('rdaOv').classList.remove('show');}
 
-function rdaChoose(action){
+async function rdaChoose(action){
   const {mainSku,dopSku}=_rdaState;
   if(action==='cancel'){closeRda();return;}
-  if(action==='standalone'){
-    _rmDopRaw(mainSku,dopSku);
-    addLog('standalone',dopSku,`${dopSku} стал главным товаром (убран из дублей ${mainSku})`);
-    closeRda();apply();
-  } else if(action==='delete'){
-    const o=getOvs();
-    if(!o[dopSku]) o[dopSku]={};
-    o[dopSku].deleted=true;
-    saveOvs(o);
-    _rmDopRaw(mainSku,dopSku);
-    addLog('delete',dopSku,`${dopSku} удалён из базы (был дублём ${mainSku})`);
-    closeRda();apply();
-  } else if(action==='reassign'){
+  if(action==='reassign'){
     document.getElementById('rdaSearch').style.display='block';
     document.getElementById('rdaInp').focus();
+    return;
   }
+  closeRda();
+  const ok = await apiAction({action:'remove_dup',main_sku:mainSku,dop_sku:dopSku,choice:action});
+  if(ok) location.reload();
 }
 
 function rdaSearchItems(q){
@@ -676,75 +679,77 @@ function rdaSearchItems(q){
   </div>`).join('');
 }
 
-function rdaReassign(targetSku){
+async function rdaReassign(targetSku){
   const {mainSku,dopSku}=_rdaState;
-  _rmDopRaw(mainSku,dopSku);
-  // add to target
-  const o=getOvs();
-  if(!o[targetSku]) o[targetSku]={};
-  if(!o[targetSku].addDops) o[targetSku].addDops=[];
-  if(!o[targetSku].addDops.includes(dopSku)) o[targetSku].addDops.push(dopSku);
-  if(o[targetSku].rmDops) o[targetSku].rmDops=o[targetSku].rmDops.filter(s=>s!==dopSku);
-  saveOvs(o);
-  const tr=DATA.find(r=>r.main_sku===targetSku);
-  const tname=(tr?.catalog_info?.title||tr?.name||targetSku).slice(0,40);
-  addLog('reassign',dopSku,`${dopSku} → переназначен как дубль «${tname}» (${targetSku})`);
-  closeRda();apply();
+  closeRda();
+  const ok = await apiAction({action:'remove_dup',main_sku:mainSku,dop_sku:dopSku,choice:'reassign',target_sku:targetSku});
+  if(ok) location.reload();
 }
 
 function removeDop(mainSku,dopSku){
   openRmDupModal(mainSku,dopSku);
 }
 
-function addDop(mainSku,dopSku){
+async function addDop(mainSku,dopSku){
   dopSku=dopSku.trim();
   if(!dopSku) return;
-  const o=getOvs();
-  if(!o[mainSku]) o[mainSku]={};
-  if(!o[mainSku].addDops) o[mainSku].addDops=[];
-  if(!o[mainSku].addDops.includes(dopSku)) o[mainSku].addDops.push(dopSku);
-  if(o[mainSku].rmDops) o[mainSku].rmDops=o[mainSku].rmDops.filter(s=>s!==dopSku);
-  saveOvs(o);
-  addLog('add_dup',mainSku,`Добавлен дубль ${dopSku} к ${mainSku}`);
-  apply();
+  const ok = await apiAction({action:'add_dup',main_sku:mainSku,new_sku:dopSku});
+  if(ok) location.reload();
 }
 
-function removeFlag(mainSku,flag){
-  const o=getOvs();
-  if(!o[mainSku]) o[mainSku]={};
-  if(!o[mainSku].rmFlags) o[mainSku].rmFlags=[];
-  if(!o[mainSku].rmFlags.includes(flag)) o[mainSku].rmFlags.push(flag);
-  saveOvs(o);
-  addLog('rm_flag',mainSku,`Снят флаг "${flag}" с ${mainSku}`);
-  apply();
+async function removeFlag(mainSku,flag){
+  const ok = await apiAction({action:'remove_flag',main_sku:mainSku,flag});
+  if(ok) location.reload();
 }
 
 // ══ CHANGE LOG ════════════════════════════════════════════════════
-function getLogs(){try{return JSON.parse(localStorage.getItem('nm_log')||'[]')}catch{return[]}}
-function addLog(action,sku,text){
-  const logs=getLogs();
-  logs.unshift({ts:new Date().toISOString(),user:currentUser,action,sku,text});
-  if(logs.length>1000) logs.length=1000;
-  localStorage.setItem('nm_log',JSON.stringify(logs));
-}
-function openLog(){
-  const logs=getLogs();
-  const body=document.getElementById('logBody');
-  if(!logs.length){body.innerHTML='<div class="log-empty">Изменений пока нет</div>';}
-  else{
-    body.innerHTML=logs.map(l=>`<div class="le">
-      <span class="le-time">${new Date(l.ts).toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
-      <span class="le-user ${l.user}">${l.user}</span>
-      <span class="le-txt">${l.text}</span>
-    </div>`).join('');
+function _actionLabel(e){
+  const p=e.params||{};
+  if(e.action==='remove_dup'){
+    if(p.choice==='standalone') return p.dop_sku+' → стал главным товаром (из '+p.main_sku+')';
+    if(p.choice==='delete')     return p.dop_sku+' → удалён (был дублём '+p.main_sku+')';
+    if(p.choice==='reassign')   return p.dop_sku+' → переназначен к '+p.target_sku;
   }
-  document.getElementById('logOv').classList.add('show');
+  if(e.action==='add_dup')     return 'Добавлен дубль '+p.new_sku+' к '+p.main_sku;
+  if(e.action==='remove_flag') return 'Снят флаг "'+p.flag+'" с '+p.main_sku;
+  if(e.action==='revert')      return '↩ Отменено: '+p.original_action+' (id:'+p.reverted_id+')';
+  if(e.action==='reset_to_backup') return '⚠ База сброшена к бэкапу';
+  return e.action;
 }
+
+async function openLog(){
+  document.getElementById('logOv').classList.add('show');
+  const body=document.getElementById('logBody');
+  body.innerHTML='<div class="log-empty">Загрузка...</div>';
+  let logs=[];
+  try{ const r=await fetch('/api/log'); logs=await r.json(); }
+  catch(e){ body.innerHTML='<div class="log-empty">Нет связи с сервером</div>'; return; }
+  if(!logs.length){ body.innerHTML='<div class="log-empty">Изменений пока нет</div>'; return; }
+  const rows=[...logs].reverse().map(function(e){
+    const dt=new Date(e.ts).toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const canRevert=(!e.reverted&&e.action!=='revert'&&e.action!=='reset_to_backup');
+    const revBtn=canRevert?'<button class="le-revert" onclick="revertAction(\''+e.id+'\',this)">Вернуть</button>':'';
+    const revTag=e.reverted?'<span class="le-reverted">отменено</span>':'';
+    return '<div class="le'+(e.reverted?' reverted':'')+'"><span class="le-time">'+dt+'</span><span class="le-user '+(e.user||'')+'">'+(e.user||'?')+'</span><span class="le-txt">'+_actionLabel(e)+'</span>'+revTag+revBtn+'</div>';
+  });
+  body.innerHTML=rows.join('');
+}
+
+async function revertAction(aid,btn){
+  if(!confirm('Вернуть это действие?')) return;
+  btn.disabled=true; btn.textContent='...';
+  const ok=await apiRevert(aid);
+  if(ok){ document.getElementById('logOv').classList.remove('show'); location.reload(); }
+  else{ btn.disabled=false; btn.textContent='Вернуть'; }
+}
+
 function exportLog(){
-  const a=document.createElement('a');
-  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({log:getLogs(),overrides:getOvs()},null,2));
-  a.download='nm_changes_'+new Date().toISOString().slice(0,10)+'.json';
-  a.click();
+  fetch('/api/log').then(function(r){return r.json();}).then(function(log){
+    const a=document.createElement('a');
+    a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(log,null,2));
+    a.download='nm_log_'+new Date().toISOString().slice(0,10)+'.json';
+    a.click();
+  });
 }
 
 
