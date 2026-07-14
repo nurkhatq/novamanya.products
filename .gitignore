@@ -1,0 +1,8 @@
+*.json
+*.xlsx
+*.py
+__pycache__/
+*.pyc
+.env
+master_skus.txt
+categories.xlsx
