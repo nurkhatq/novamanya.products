@@ -612,8 +612,7 @@ async function apiAction(payload){
     if(!r.ok){ alert('Ошибка сервера: '+(d.error||r.status)); return false; }
     return true;
   } catch(e) {
-    alert('Нет связи с сервером. Запустите server.py
-'+e);
+    alert('Нет связи с сервером. Запустите server.py: ' + e);
     return false;
   }
 }
