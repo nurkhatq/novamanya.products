@@ -893,9 +893,14 @@ function scrollCar(dir){
 function apply(){
   buildCatPills();
   const working=applyOvs(DATA);
+  // Build set of SKUs that are already dop_skus of another record — hide them from main grid
+  const isDopOf=new Set();
+  working.forEach(d=>(d.dop_skus||[]).forEach(s=>isDopOf.add(s)));
   const q=fSearch.toLowerCase();
   const bq=fBrand.toLowerCase();
   filtered=working.filter(d=>{
+    // If this SKU is listed as a dop_sku of another record, hide it (unless searching by exact SKU)
+    if(isDopOf.has(d.main_sku)&&!(q&&d.main_sku.includes(q))) return false;
     if(fFilter==='active'     && d.catalog_info?.status!=='active') return false;
     if(fFilter==='inactive'   && d.catalog_info?.status!=='inactive') return false;
     if(fFilter==='dups'       && !d.dop_skus?.length) return false;
@@ -924,7 +929,8 @@ function apply(){
   const parts=[];
   if(fBrand) parts.push('Бренд: '+fBrand);
   if(fCat)   parts.push('Категория: '+fCat);
-  document.getElementById('rinfo').textContent=`Показано: ${filtered.length} из ${DATA.length}${parts.length?' · '+parts.join(' · '):''}`;
+  const uniqueTotal=DATA.length-isDopOf.size;
+  document.getElementById('rinfo').textContent=`Показано: ${filtered.length} из ${uniqueTotal} (${isDopOf.size} скрыто как дубли)${parts.length?' · '+parts.join(' · '):''}`;
   document.getElementById('ndBanner').style.display=(fFilter==='name_dup')?'block':'none';
   render();
 }
