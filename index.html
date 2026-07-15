@@ -509,7 +509,7 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
       <option value="all">Все</option>
       <option value="dups">С дублями</option>
       <option value="barcode">По штрихкоду</option>
-      <option value="name_dup">По имени МС</option>
+      <option value="needs_review">Требует проверки</option>
       <option value="single">1-комп. бандлы</option>
       <option value="active">Активные</option>
       <option value="inactive">Неактивные</option>
@@ -555,7 +555,7 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 <!-- ══ MAIN ══ -->
 <main>
   <div class="nd-banner" id="ndBanner" style="display:none">
-    <b>Раздел: дубли по названию МС</b> — здесь товары, объединённые автоматически по совпадению названия в МойСклад. Проверьте каждую карточку через «Ред.» и уберите неверные связи.
+    <b>Требует проверки</b> — эти товары связаны как дубли, но у них нет общего штрихкода и разные названия. Проверьте и уберите неверные связи через «Убрать».
   </div>
   <div class="rinfo" id="rinfo"></div>
   <div class="grid" id="grid"></div>
@@ -851,7 +851,7 @@ function buildCatPills(){
     if(fFilter==='inactive'   && d.catalog_info?.status!=='inactive') return;
     if(fFilter==='dups'       && !d.dop_skus?.length) return;
     if(fFilter==='barcode'    && !d.flags?.includes('barcode_dup')) return;
-    if(fFilter==='name_dup'   && !d.flags?.includes('name_dup')) return;
+    if(fFilter==='needs_review' && !d.flags?.includes('needs_review')) return;
     if(fFilter==='single'     && !d.flags?.includes('single_component')) return;
     if(fFilter==='kaspi_only' && d.source!=='kaspi_only') return;
     if(fType==='Товар'      && d.ms_type!=='Товар') return;
@@ -908,7 +908,7 @@ function apply(){
     if(fFilter==='inactive'   && d.catalog_info?.status!=='inactive') return false;
     if(fFilter==='dups'       && !d.dop_skus?.length) return false;
     if(fFilter==='barcode'    && !d.flags?.includes('barcode_dup')) return false;
-    if(fFilter==='name_dup'   && !d.flags?.includes('name_dup')) return false;
+    if(fFilter==='needs_review' && !d.flags?.includes('needs_review')) return false;
     if(fFilter==='single'     && !d.flags?.includes('single_component')) return false;
     if(fFilter==='kaspi_only' && d.source!=='kaspi_only') return false;
     if(fType==='Товар'      && d.ms_type!=='Товар') return false;
@@ -934,7 +934,7 @@ function apply(){
   if(fCat)   parts.push('Категория: '+fCat);
   const uniqueTotal=DATA.length-isDopOf.size;
   document.getElementById('rinfo').textContent=`Показано: ${filtered.length} из ${uniqueTotal} (${isDopOf.size} скрыто как дубли)${parts.length?' · '+parts.join(' · '):''}`;
-  document.getElementById('ndBanner').style.display=(fFilter==='name_dup')?'block':'none';
+  document.getElementById('ndBanner').style.display=(fFilter==='needs_review')?'block':'none';
   render();
 }
 
@@ -978,7 +978,7 @@ function buildCard(item,idx){
   const fhtml=[];
   if(flags.includes('has_dop_art')) fhtml.push(`<span class="flag f-dop">Доп.арт</span>`);
   if(flags.includes('barcode_dup')) fhtml.push(`<span class="flag f-bc">Штрихкод</span>`);
-  if(flags.includes('name_dup'))    fhtml.push(`<span class="flag f-nm"> Имя МС</span>`);
+  if(flags.includes('needs_review')) fhtml.push(`<span class="flag f-nm">⚠ Проверить</span>`);
   if(flags.includes('single_component')) fhtml.push(`<span class="flag f-sc">→ 1-комп</span>`);
 
   const price=cat.price?`<span class="price">${cat.price.toLocaleString('ru')} ₸</span>`:'';
