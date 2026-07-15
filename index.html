@@ -292,7 +292,9 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .dp-add-btn:hover{background:var(--grn);color:#fff}
 .comp-blk{background:var(--pur-bg);border-radius:var(--rs);padding:8px 10px;margin-bottom:8px}
 .comp-blk-t{font-size:.7rem;font-weight:700;color:var(--pur);margin-bottom:4px}
-.comp-blk-i{font-size:.76rem;color:var(--txt2);padding:1px 0}
+.comp-blk-i{font-size:.76rem;color:var(--txt2);padding:2px 0;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.comp-rm-btn{background:none;border:none;color:#ccc;font-size:.7rem;cursor:pointer;padding:0 2px;flex-shrink:0}.comp-rm-btn:hover{color:var(--acc)}
+.comp-add-row{display:flex;gap:6px;margin-top:6px}
 
 .empty{text-align:center;padding:60px 20px;color:var(--gry)}
 .empty .ico{font-size:2.5rem;margin-bottom:8px}
@@ -1056,8 +1058,21 @@ function tyBadge(item){
 
 function buildDp(item){
   let html='';
-  if(item.ms_type==='Комплект'&&item.components?.length){
-    html+=`<div class="comp-blk"><div class="comp-blk-t">Компоненты (${item.comp_count})</div>${item.components.map(c=>`<div class="comp-blk-i">• ${c}</div>`).join('')}</div>`;
+  if(item.ms_type==='Комплект'){
+    const comps=item.components||[];
+    const compRows=comps.map(c=>{
+      const rmComp=currentUser
+        ?`<button class="comp-rm-btn" onclick="event.stopPropagation();rmComp('${item.main_sku}','${c.replace(/'/g,"\\'")}')">✕</button>`
+        :'';
+      return `<div class="comp-blk-i">• ${c}${rmComp}</div>`;
+    }).join('');
+    const addComp=currentUser
+      ?`<div class="comp-add-row">
+          <input class="dp-add-inp" id="cpa_${item.main_sku}" type="text" placeholder="Название компонента" onclick="event.stopPropagation()">
+          <button class="dp-add-btn" onclick="event.stopPropagation();addComp('${item.main_sku}',document.getElementById('cpa_${item.main_sku}').value)">+ Добавить</button>
+        </div>`
+      :'';
+    html+=`<div class="comp-blk"><div class="comp-blk-t">Компоненты (${comps.length})</div>${compRows}${addComp}</div>`;
   }
   const addBlock=currentUser?`<div class="dp-add-row">
     <input class="dp-add-inp" id="dpa_${item.main_sku}" type="text" placeholder="SKU дубля для добавления" onclick="event.stopPropagation()">
@@ -1101,6 +1116,18 @@ function chp(e,idx,dir){
 function tog(e,idx){
   if(e)e.stopPropagation();
   document.querySelector('.card[data-idx="'+idx+'"]')?.classList.toggle('expanded');
+}
+
+async function addComp(mainSku,name){
+  name=name.trim();
+  if(!name) return;
+  const ok=await apiAction({action:'add_component',main_sku:mainSku,comp_name:name});
+  if(ok) await refreshFromServer();
+}
+
+async function rmComp(mainSku,name){
+  const ok=await apiAction({action:'remove_component',main_sku:mainSku,comp_name:name});
+  if(ok) await refreshFromServer();
 }
 
 function cpTxt(txt,el){
