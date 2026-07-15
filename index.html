@@ -1007,17 +1007,14 @@ function buildCard(item,idx){
       <div class="cf-left">Дублей: <b>${dopCount}</b>${compTxt}</div>
       <div class="cf-right">${kaspiBtn}${expBtn}</div>
     </div>
-    ${canExp?`<div class="dp" id="dp${idx}"><div class="dp-inner">${buildDp(item)}</div></div>`:''}`;
+    ${canExp?`<div class="dp" id="dp${idx}" onclick="event.stopPropagation()"><div class="dp-inner">${buildDp(item)}</div></div>`:''}`;
 
   if(photos.length>1){
     card.querySelectorAll('.ph-dot').forEach(dot=>{
       dot.addEventListener('click',e=>{e.stopPropagation();setPhoto(idx,photos,+dot.dataset.i);});
     });
   }
-  if(canExp) card.addEventListener('click',()=>{
-    if(window.getSelection().toString().length>0) return;
-    tog(null,idx);
-  });
+  if(canExp) card.addEventListener('click',()=>tog(null,idx));
   return card;
 }
 
