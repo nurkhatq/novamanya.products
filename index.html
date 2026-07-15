@@ -321,7 +321,7 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 }
 
 /* ══ LOGIN ══════════════════════════════════════════════════════ */
-.login-ov{position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:3000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.login-ov{position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:3000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
 .login-box{background:#fff;border-radius:18px;padding:38px 44px;width:360px;box-shadow:0 24px 64px rgba(0,0,0,.35);text-align:center}
 .login-logo{font-size:2.2rem;margin-bottom:10px}
 .login-box h2{font-size:1.2rem;color:var(--txt);margin-bottom:4px}
@@ -658,7 +658,7 @@ async function rdaChoose(action){
   }
   closeRda();
   const ok = await apiAction({action:'remove_dup',main_sku:mainSku,dop_sku:dopSku,choice:action});
-  if(ok) location.reload();
+  if(ok) await refreshFromServer();
 }
 
 function rdaSearchItems(q){
@@ -682,7 +682,7 @@ async function rdaReassign(targetSku){
   const {mainSku,dopSku}=_rdaState;
   closeRda();
   const ok = await apiAction({action:'remove_dup',main_sku:mainSku,dop_sku:dopSku,choice:'reassign',target_sku:targetSku});
-  if(ok) location.reload();
+  if(ok) await refreshFromServer();
 }
 
 function removeDop(mainSku,dopSku){
@@ -693,12 +693,12 @@ async function addDop(mainSku,dopSku){
   dopSku=dopSku.trim();
   if(!dopSku) return;
   const ok = await apiAction({action:'add_dup',main_sku:mainSku,new_sku:dopSku});
-  if(ok) location.reload();
+  if(ok) await refreshFromServer();
 }
 
 async function removeFlag(mainSku,flag){
   const ok = await apiAction({action:'remove_flag',main_sku:mainSku,flag});
-  if(ok) location.reload();
+  if(ok) await refreshFromServer();
 }
 
 // ══ CHANGE LOG ════════════════════════════════════════════════════
@@ -738,7 +738,7 @@ async function revertAction(aid,btn){
   if(!confirm('Вернуть это действие?')) return;
   btn.disabled=true; btn.textContent='...';
   const ok=await apiRevert(aid);
-  if(ok){ document.getElementById('logOv').classList.remove('show'); location.reload(); }
+  if(ok){ document.getElementById('logOv').classList.remove('show'); await refreshFromServer(); }
   else{ btn.disabled=false; btn.textContent='Вернуть'; }
 }
 
@@ -1081,7 +1081,7 @@ apply();
 // Refresh data from server in background (VPS API)
 async function refreshFromServer(){
   try{
-    const r=await fetch('/api/db');
+    const r=await fetch('/api/db',{cache:'no-store'});
     if(!r.ok) return;
     const fresh=await r.json();
     if(fresh&&fresh.length){
