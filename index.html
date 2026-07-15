@@ -263,7 +263,8 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .dp-inner{padding:11px 12px 13px}
 .dp-title{font-size:.72rem;font-weight:700;color:var(--gry);text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px}
 .dp-list{display:flex;flex-direction:column;gap:7px}
-.di{display:flex;gap:9px;background:var(--sur);border-radius:var(--rs);padding:8px;border:1px solid var(--brd);align-items:flex-start}
+.di{display:flex;gap:9px;background:var(--sur);border-radius:var(--rs);padding:8px;border:1px solid var(--brd);align-items:flex-start;cursor:pointer}
+.di:hover{background:#f0f9ff;border-color:#90caf9}
 .di-ph{width:60px;height:60px;border-radius:5px;object-fit:contain;background:#f0f4f8;flex-shrink:0}
 .di-ph-ph{width:60px;height:60px;border-radius:5px;background:#f0f4f8;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;color:#c5ccd6}
 .di-info{flex:1;min-width:0}
@@ -1007,7 +1008,7 @@ function buildCard(item,idx){
       <div class="cf-left">Дублей: <b>${dopCount}</b>${compTxt}</div>
       <div class="cf-right">${kaspiBtn}${expBtn}</div>
     </div>
-    ${canExp?`<div class="dp" id="dp${idx}" onclick="event.stopPropagation()"><div class="dp-inner">${buildDp(item)}</div></div>`:''}`;
+    ${canExp?`<div class="dp" id="dp${idx}"><div class="dp-inner">${buildDp(item)}</div></div>`:''}`;
 
   if(photos.length>1){
     card.querySelectorAll('.ph-dot').forEach(dot=>{
@@ -1055,7 +1056,7 @@ function buildDp(item){
     if(dc.stock!=null) bgs.push(`<span class="dbadge db-s">${dc.stock} шт.</span>`);
     if(dlink) bgs.push(`<a class="dl" href="${dlink}" target="_blank" onclick="event.stopPropagation()">Kaspi →</a>`);
     const rmBtn=currentUser?`<button class="di-rm-btn" onclick="event.stopPropagation();openRmDupModal('${item.main_sku}','${dopSku}')">Убрать</button>`:'';
-    html+=`<div class="di">${phEl}<div class="di-info"><div class="di-title">${dtitle}</div><div class="di-sku">${dopSku}</div><div class="di-badges">${bgs.join('')}</div></div>${rmBtn}</div>`;
+    html+=`<div class="di" onclick="event.stopPropagation();cpTxt('${dopSku}',this.querySelector('.di-sku'))">${phEl}<div class="di-info"><div class="di-title">${dtitle}</div><div class="di-sku">${dopSku}</div><div class="di-badges">${bgs.join('')}</div></div>${rmBtn}</div>`;
   });
   return html+`</div>${addBlock}`;
 }
