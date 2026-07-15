@@ -903,7 +903,7 @@ function apply(){
   const bq=fBrand.toLowerCase();
   filtered=working.filter(d=>{
     // If this SKU is listed as a dop_sku of another record, hide it (unless searching by exact SKU)
-    if(isDopOf.has(d.main_sku)&&!(q&&d.main_sku.includes(q))) return false;
+    if(isDopOf.has(d.main_sku)) return false;
     if(fFilter==='active'     && d.catalog_info?.status!=='active') return false;
     if(fFilter==='inactive'   && d.catalog_info?.status!=='inactive') return false;
     if(fFilter==='dups'       && !d.dop_skus?.length) return false;
