@@ -236,8 +236,8 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .mstock{font-size:.73rem;color:var(--gry)}
 .cb-skus{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px}
 .sku{font-family:monospace;font-size:.64rem;padding:2px 6px;border-radius:4px;word-break:break-all}
-.sku-main{background:var(--yel-bg);color:var(--yel)}
-.sku-art {background:#eef2ff;color:#3b5bdb}
+.sku-main{background:var(--yel-bg);color:var(--yel);cursor:pointer}
+.sku-art {background:#eef2ff;color:#3b5bdb;cursor:pointer}
 .cb-flags{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px}
 .flag{padding:1px 6px;border-radius:8px;font-size:.62rem;font-weight:700}
 .f-dop{background:var(--yel-bg);color:var(--yel)}
@@ -428,7 +428,7 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .rda-empty{padding:14px;text-align:center;color:var(--gry);font-size:.8rem}
 
 /* ══ BARCODE + NAME_DUP BANNER ══════════════════════════════════ */
-.sku-bar{background:#f3f0ff;color:#7950f2}
+.sku-bar{background:#f3f0ff;color:#7950f2;cursor:pointer}
 .nd-banner{background:#fff3bf;border:1.5px solid #f6d860;border-radius:var(--r);padding:10px 16px;margin-bottom:12px;font-size:.8rem;color:#92660a;line-height:1.5}
 </style>
 </head>
@@ -997,9 +997,9 @@ function buildCard(item,idx){
       <div class="cb-title">${T(item)||'(без названия)'}</div>
       <div class="cb-row">${price}${stock}</div>
       <div class="cb-skus">
-        ${item.main_sku?`<span class="sku sku-main">${item.main_sku}</span>`:''}
-        ${item.article?`<span class="sku sku-art">Арт: ${item.article}</span>`:''}
-        ${barcode?`<span class="sku sku-bar">ШК: ${barcode}</span>`:''}
+        ${item.main_sku?`<span class="sku sku-main" title="Нажмите чтобы скопировать" onclick="event.stopPropagation();cpTxt('${item.main_sku}',this)">${item.main_sku}</span>`:''}
+        ${item.article?`<span class="sku sku-art" title="Нажмите чтобы скопировать" onclick="event.stopPropagation();cpTxt('${item.article}',this)">Арт: ${item.article}</span>`:''}
+        ${barcode?`<span class="sku sku-bar" title="Нажмите чтобы скопировать" onclick="event.stopPropagation();cpTxt('${barcode}',this)">ШК: ${barcode}</span>`:''}
       </div>
       ${fhtml.length?`<div class="cb-flags">${fhtml.join('')}</div>`:''}
     </div>
@@ -1014,7 +1014,10 @@ function buildCard(item,idx){
       dot.addEventListener('click',e=>{e.stopPropagation();setPhoto(idx,photos,+dot.dataset.i);});
     });
   }
-  if(canExp) card.addEventListener('click',()=>tog(null,idx));
+  if(canExp) card.addEventListener('click',()=>{
+    if(window.getSelection().toString().length>0) return;
+    tog(null,idx);
+  });
   return card;
 }
 
@@ -1075,6 +1078,14 @@ function chp(e,idx,dir){
 function tog(e,idx){
   if(e)e.stopPropagation();
   document.querySelector('.card[data-idx="'+idx+'"]')?.classList.toggle('expanded');
+}
+
+function cpTxt(txt,el){
+  navigator.clipboard.writeText(txt).then(()=>{
+    const orig=el.textContent;
+    el.textContent='✓ скопировано';
+    setTimeout(()=>el.textContent=orig,1200);
+  });
 }
 
 // ══ INIT ══════════════════════════════════════════════════════════
