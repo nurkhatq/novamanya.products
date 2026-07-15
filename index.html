@@ -198,6 +198,10 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .card.has-dups{cursor:pointer;transition:box-shadow .18s,transform .18s}
 .card.has-dups:hover{box-shadow:var(--sh2);transform:translateY(-2px)}
 .card.expanded{border-color:#457b9d}
+.card.verified{border-color:#2f9e44;border-width:2px}
+.chk-btn{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:8px;border:1.5px solid var(--brd);background:var(--sur);color:var(--gry);font-size:.75rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.chk-btn:hover{border-color:#2f9e44;color:#2f9e44}
+.chk-btn.checked{border-color:#2f9e44;background:#ebfbee;color:#2f9e44}
 
 /* Photo */
 .ph{position:relative;height:180px;background:#f0f4f8;overflow:hidden}
@@ -1009,6 +1013,27 @@ function buildCard(item,idx){
       <div class="cf-right">${kaspiBtn}${expBtn}</div>
     </div>
     ${canExp?`<div class="dp" id="dp${idx}"><div class="dp-inner">${buildDp(item)}</div></div>`:''}`;
+
+  const isVerified=flags.includes('verified');
+  card.classList.toggle('verified',isVerified);
+  if(currentUser){
+    const chkBtn=document.createElement('button');
+    chkBtn.className='chk-btn'+(isVerified?' checked':'');
+    chkBtn.innerHTML=isVerified?'✓ Проверено':'✓ Проверить';
+    chkBtn.title='Отметить как проверенный';
+    chkBtn.onclick=async e=>{
+      e.stopPropagation();
+      const nowVerified=!card.classList.contains('verified');
+      const action=nowVerified?'set_flag':'remove_flag';
+      const ok=await apiAction({action,main_sku:item.main_sku,flag:'verified'});
+      if(ok){
+        card.classList.toggle('verified',nowVerified);
+        chkBtn.classList.toggle('checked',nowVerified);
+        chkBtn.innerHTML=nowVerified?'✓ Проверено':'✓ Проверить';
+      }
+    };
+    card.querySelector('.cf-right').prepend(chkBtn);
+  }
 
   if(photos.length>1){
     card.querySelectorAll('.ph-dot').forEach(dot=>{
