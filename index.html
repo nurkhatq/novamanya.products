@@ -258,6 +258,8 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .klink:hover{text-decoration:underline}
 .exp-btn{display:flex;align-items:center;gap:3px;font-size:.73rem;color:#457b9d;background:none;border:none;cursor:pointer;font-weight:600}
 .exp-btn:hover{color:var(--acc)}
+.exp-btn-add{color:var(--grn);opacity:.75}
+.exp-btn-add:hover{color:var(--grn);opacity:1}
 .exp-ico{transition:transform .22s}
 .card.expanded .exp-ico{transform:rotate(180deg)}
 
@@ -521,6 +523,8 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
       <option value="active">Активные</option>
       <option value="inactive">Неактивные</option>
       <option value="kaspi_only">Только в Каспи</option>
+      <option value="verified">Проверено</option>
+      <option value="not_verified">Не проверено</option>
     </select>
     <select class="ss" id="msType">
       <option value="all">Все типы</option>
@@ -699,6 +703,8 @@ function removeDop(mainSku,dopSku){
 async function addDop(mainSku,dopSku){
   dopSku=dopSku.trim();
   if(!dopSku) return;
+  if(dopSku===mainSku){alert('Нельзя добавить товар как дубль самого себя');return;}
+  if(!skuMap[dopSku]){alert('SKU не найден в базе:\n'+dopSku);return;}
   const ok = await apiAction({action:'add_dup',main_sku:mainSku,new_sku:dopSku});
   if(ok) await refreshFromServer();
 }
@@ -917,7 +923,9 @@ function apply(){
     if(fFilter==='barcode'    && !d.flags?.includes('barcode_dup')) return false;
     if(fFilter==='needs_review' && !d.flags?.includes('needs_review')) return false;
     if(fFilter==='single'     && !d.flags?.includes('single_component')) return false;
-    if(fFilter==='kaspi_only' && d.source!=='kaspi_only') return false;
+    if(fFilter==='kaspi_only'   && d.source!=='kaspi_only') return false;
+    if(fFilter==='verified'     && !d.flags?.includes('verified')) return false;
+    if(fFilter==='not_verified' && d.flags?.includes('verified')) return false;
     if(fType==='Товар'      && d.ms_type!=='Товар') return false;
     if(fType==='Комплект'   && d.ms_type!=='Комплект') return false;
     if(bq && B(d).toLowerCase()!==bq) return false;
@@ -964,7 +972,8 @@ function buildCard(item,idx){
   const isKO=item.source==='kaspi_only';
   const hasDups=item.dop_skus?.length>0;
   const isSingle=item.flags?.includes('single_component');
-  const canExp=hasDups||isSingle||(item.ms_type==='Комплект'&&item.components?.length);
+  const hasContent=hasDups||isSingle||(item.ms_type==='Комплект'&&item.components?.length);
+  const canExp=hasContent||!!currentUser;
 
   const card=document.createElement('div');
   card.className='card'+(canExp?' has-dups':'');
@@ -995,7 +1004,8 @@ function buildCard(item,idx){
   const dopCount=item.dop_skus?.length||0;
   const compTxt=item.comp_count!=null?` · Комп: <b>${item.comp_count}</b>`:'';
   const kaspiBtn=shopLink?`<a class="klink" href="${shopLink}" target="_blank" onclick="event.stopPropagation()">Kaspi →</a>`:'';
-  const expBtn=canExp?`<button class="exp-btn" onclick="tog(event,${idx})">Дубли <svg class="exp-ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>`:'';
+  const expBtnLabel=hasContent?'Дубли':'+ Дубль';
+  const expBtn=canExp?`<button class="exp-btn${hasContent?'':' exp-btn-add'}" onclick="tog(event,${idx})">${expBtnLabel} <svg class="exp-ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>`:'';
 
   card.innerHTML=`
     ${phHtml}
@@ -1068,14 +1078,14 @@ function buildDp(item){
     }).join('');
     const addComp=currentUser
       ?`<div class="comp-add-row">
-          <input class="dp-add-inp" id="cpa_${item.main_sku}" type="text" placeholder="Название компонента" onclick="event.stopPropagation()">
+          <input class="dp-add-inp" id="cpa_${item.main_sku}" type="text" placeholder="Название компонента" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.stopPropagation();addComp('${item.main_sku}',this.value)}">
           <button class="dp-add-btn" onclick="event.stopPropagation();addComp('${item.main_sku}',document.getElementById('cpa_${item.main_sku}').value)">+ Добавить</button>
         </div>`
       :'';
     html+=`<div class="comp-blk"><div class="comp-blk-t">Компоненты (${comps.length})</div>${compRows}${addComp}</div>`;
   }
   const addBlock=currentUser?`<div class="dp-add-row">
-    <input class="dp-add-inp" id="dpa_${item.main_sku}" type="text" placeholder="SKU дубля для добавления" onclick="event.stopPropagation()">
+    <input class="dp-add-inp" id="dpa_${item.main_sku}" type="text" placeholder="SKU дубля для добавления" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.stopPropagation();addDop('${item.main_sku}',this.value)}">
     <button class="dp-add-btn" onclick="event.stopPropagation();addDop('${item.main_sku}',document.getElementById('dpa_${item.main_sku}').value)">+ Добавить</button>
   </div>`:'';
   if(!item.dop_skus?.length) return html+(addBlock||'<p style="color:var(--gry);font-size:.78rem">Нет доп. артикулов</p>');
