@@ -448,27 +448,25 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .tab-badge{display:inline-block;background:var(--acc);color:#fff;border-radius:20px;padding:1px 6px;font-size:.66rem;margin-left:4px;vertical-align:middle}
 
 /* ══ ПРОВЕРКА VIEW ══════════════════════════════════════════════ */
-.check-view{display:none;padding:20px 22px;max-width:1100px;margin:0 auto;width:100%}
+.check-view{display:none;padding:18px 22px;max-width:1440px;margin:0 auto;width:100%}
 .check-view.show{display:block}
-.check-sec{margin-bottom:28px}
-.check-sec-hd{font-size:.84rem;font-weight:800;color:var(--txt);margin-bottom:10px;display:flex;align-items:center;gap:8px;padding:0 2px}
-.ck-badge{background:var(--acc);color:#fff;border-radius:20px;padding:2px 9px;font-size:.72rem;font-weight:700}
-.ck-badge.grn{background:var(--grn)}
-.ck-row{background:#fff;border-radius:10px;box-shadow:var(--sh);margin-bottom:8px;padding:10px 14px;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
-.ck-row.done{opacity:.45}
-.ck-left{flex:1;min-width:180px}
-.ck-mid{display:flex;align-items:center;font-size:1.1rem;color:var(--gry);padding-top:4px;flex-shrink:0}
-.ck-right{flex:1;min-width:180px}
-.ck-name{font-size:.8rem;font-weight:700;color:var(--txt);line-height:1.3}
-.ck-sku{font-family:monospace;font-size:.68rem;color:var(--gry);margin-top:2px}
-.ck-actions{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap;align-items:flex-start;padding-top:2px;flex-shrink:0}
-.ckbtn{padding:5px 11px;border-radius:14px;border:none;cursor:pointer;font-size:.74rem;font-weight:700;transition:all .15s;white-space:nowrap}
-.ckbtn-add{background:var(--grn-bg);color:var(--grn)}.ckbtn-add:hover{background:var(--grn);color:#fff}
-.ckbtn-rm{background:#fff5f5;color:var(--acc)}.ckbtn-rm:hover{background:var(--acc);color:#fff}
-.ckbtn-mod{background:var(--yel-bg);color:var(--yel)}.ckbtn-mod:hover{background:var(--yel);color:#fff}
-.ckbtn-done{background:var(--gry-bg);color:var(--gry);text-decoration:line-through;cursor:default}
-.check-empty{text-align:center;padding:30px;color:var(--grn);font-weight:700;font-size:.88rem}
+.ck-info{font-size:.78rem;color:var(--gry);margin-bottom:12px}
 .check-load{text-align:center;padding:40px;color:var(--gry);font-size:.85rem}
+/* Missing dop item — grayed, "needs to be added" */
+.di.di-missing{opacity:.55;background:#f8fbff;border-style:dashed;border-color:#90caf9;cursor:default}
+.di.di-missing:hover{background:#f0f9ff;border-color:#64b5f6}
+.di-missing .di-title{color:var(--gry)}
+.di-add-btn{flex-shrink:0;align-self:center;padding:4px 10px;border-radius:8px;border:1px solid #74c0fc;background:none;color:var(--blue);font-size:.7rem;font-weight:700;cursor:pointer;margin-left:6px}
+.di-add-btn:hover{background:var(--blue);color:#fff}
+/* Extra dop item — highlighted, "needs to be removed" */
+.di.di-extra{background:#fff8f0;border-color:#ffa94d}
+.di.di-extra:hover{background:#fff3e0;border-color:#ff922b}
+.di-extra .di-title{color:#d9480f}
+.di-extra-lbl{font-size:.6rem;font-weight:700;color:#d9480f;background:#ffe8cc;padding:1px 6px;border-radius:6px}
+.ck-section-bar{display:flex;align-items:center;gap:8px;margin:16px 0 10px;padding:0 2px;font-size:.8rem;font-weight:700;color:var(--txt2)}
+.ck-section-bar span{background:var(--gry-bg);color:var(--gry);border-radius:20px;padding:1px 8px;font-size:.7rem}
+.ck-section-bar.miss span{background:#e7f5ff;color:var(--blue)}
+.ck-section-bar.extra span{background:#fff3e0;color:#d9480f}
 </style>
 </head>
 <body>
@@ -611,20 +609,15 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 <div class="check-view" id="checkView">
   <div class="check-load" id="ckLoad">Загружаю данные сравнения...</div>
   <div id="ckContent" style="display:none">
-    <div class="check-sec">
-      <div class="check-sec-hd">
-        Отсутствуют в базе — нужно добавить дубль
-        <span class="ck-badge" id="ckMissingBadge">0</span>
-      </div>
-      <div id="ckMissingList"></div>
+    <div class="ck-info" id="ckInfo"></div>
+    <div class="ck-section-bar miss" id="ckMissBar" style="display:none">
+      Нужно добавить дубль <span id="ckMissCnt">0</span>
     </div>
-    <div class="check-sec">
-      <div class="check-sec-hd">
-        Лишние в базе — нужно убрать дубль
-        <span class="ck-badge" id="ckExtraBadge">0</span>
-      </div>
-      <div id="ckExtraList"></div>
+    <div class="grid" id="ckMissGrid"></div>
+    <div class="ck-section-bar extra" id="ckExtraBar" style="display:none">
+      Нужно убрать дубль <span id="ckExtraCnt">0</span>
     </div>
+    <div class="grid" id="ckExtraGrid"></div>
   </div>
 </div>
 
@@ -1205,49 +1198,137 @@ function cpTxt(txt,el){
 
 // ══ ПРОВЕРКА TAB ══════════════════════════════════════════════════
 let _ckLoaded = false;
-let _ckDone   = new Set(); // SKUs already acted on this session
+let _ckData   = null; // {missing_in_vps, extra_in_vps, fresh_dups}
 
 function switchTab(tab){
   const isMain = tab === 'main';
   document.getElementById('tabMain').classList.toggle('active', isMain);
   document.getElementById('tabCheck').classList.toggle('active', !isMain);
-  document.querySelector('main').style.display         = isMain ? '' : 'none';
-  document.getElementById('carouselSection').style.display = isMain ? '' : 'none';
+  document.querySelector('main').style.display              = isMain ? '' : 'none';
+  document.getElementById('carouselSection').style.display  = isMain ? '' : 'none';
   document.getElementById('catSection').style.display       = isMain ? '' : 'none';
   document.getElementById('checkView').classList.toggle('show', !isMain);
   if(!isMain && !_ckLoaded) loadComparison();
 }
 
-function ckName(sku){
-  const rec = DATA.find(r=>r.main_sku===sku);
-  if(!rec) return '';
-  return (rec.catalog_info?.title || rec.name || '').slice(0,60);
-}
+// Build a card for Проверка — same look as main grid, extra dup markers
+function buildCkCard(mainSku, missingSet, extraSet, gridId){
+  const item  = skuMap[mainSku] || {main_sku: mainSku};
+  const cat   = item.catalog_info || {};
+  const photos = cat.photos || [];
+  const status = cat.status || '';
+  const shopLink = cat.shopLink ? KB + cat.shopLink : '';
+  const isKO = item.source === 'kaspi_only';
 
-function renderCkRow(main, dup, type, idx){
-  const mainName = ckName(main) || main;
-  const dupName  = ckName(dup)  || dup;
-  const id       = `ckrow_${type}_${idx}`;
-  const doneClass = _ckDone.has(id) ? ' done' : '';
-  let btns = '';
-  if(type==='missing'){
-    btns = `<button class="ckbtn ckbtn-add" onclick="ckAdd('${main}','${dup}','${id}')">+ Добавить дубль</button>`;
+  // Existing VPS dops for this main
+  const vdops = item.dop_skus || [];
+  // All dops to show = vdops + missingSet (missing ones shown grayed)
+  const allDops = [...new Set([...vdops, ...missingSet])];
+
+  const dopCount = vdops.length;
+  const missCnt  = missingSet.size;
+  const extraCnt = extraSet.size;
+
+  const card = document.createElement('div');
+  card.className = 'card has-dups';
+  card.dataset.cksKu = mainSku;
+
+  // Photo
+  let phHtml = '';
+  if(photos.length){
+    phHtml = `<div class="ph"><img src="${photos[0]}" alt="" loading="lazy">${stBadge(status,isKO)}${tyBadge(item)}</div>`;
   } else {
-    btns = `<button class="ckbtn ckbtn-rm"  onclick="ckRemove('${main}','${dup}','${id}')">Убрать дубль</button>`;
+    phHtml = `<div class="ph"><div class="ph-ph"><span>Нет фото</span></div>${stBadge(status,isKO)}${tyBadge(item)}</div>`;
   }
-  btns += ` <button class="ckbtn ckbtn-mod" onclick="ckModerate('${main}','${id}')">На модерацию</button>`;
-  return `<div class="ck-row${doneClass}" id="${id}">
-    <div class="ck-left">
-      <div class="ck-name">${mainName}</div>
-      <div class="ck-sku">${main}</div>
+
+  const price  = cat.price  ? `<span class="price">${cat.price.toLocaleString('ru')} ₸</span>` : '';
+  const stock  = cat.stock != null ? `<span class="mstock"> ${cat.stock} шт.</span>` : '';
+  const title  = T(item) || item.name || '(без названия)';
+  const brand  = B(item);
+
+  // Diff badges in footer
+  const diffBadges = [];
+  if(missCnt) diffBadges.push(`<span style="font-size:.68rem;color:var(--blue);font-weight:700">+${missCnt} нет в базе</span>`);
+  if(extraCnt) diffBadges.push(`<span style="font-size:.68rem;color:#d9480f;font-weight:700">−${extraCnt} лишних</span>`);
+
+  // Build expanded dup panel
+  function buildCkDp(){
+    let html = `<div class="dp-title">Дублирующие карточки (${allDops.length})</div><div class="dp-list">`;
+    allDops.forEach(dopSku => {
+      const isMissing = missingSet.has(dopSku);
+      const isExtra   = extraSet.has(dopSku);
+      const rec = skuMap[dopSku] || {};
+      const dc  = rec.catalog_info || {};
+      const dtitle = dc.title || rec.name || dopSku;
+      const photo  = dc.photos?.[0] || '';
+      const dlink  = dc.shopLink ? KB + dc.shopLink : '';
+      const st     = dc.status || '';
+
+      const phEl = photo
+        ? `<img class="di-ph" src="${photo}" alt="" loading="lazy">`
+        : `<div class="di-ph-ph">—</div>`;
+
+      const bgs = [];
+      if(st==='active')        bgs.push(`<span class="dbadge db-a">Активный</span>`);
+      else if(st==='inactive') bgs.push(`<span class="dbadge db-i">Неактивный</span>`);
+      else if(!isMissing)      bgs.push(`<span class="dbadge db-nc">Нет в Каспи</span>`);
+      if(dc.price)    bgs.push(`<span class="dbadge db-p">${dc.price.toLocaleString('ru')} ₸</span>`);
+      if(dc.stock!=null) bgs.push(`<span class="dbadge db-s">${dc.stock} шт.</span>`);
+      if(dlink) bgs.push(`<a class="dl" href="${dlink}" target="_blank" onclick="event.stopPropagation()">Kaspi →</a>`);
+
+      let action = '';
+      if(isMissing){
+        bgs.push(`<span class="dbadge" style="background:#e7f5ff;color:#1971c2">нет в базе</span>`);
+        if(currentUser)
+          action = `<button class="di-add-btn" onclick="event.stopPropagation();ckAdd('${mainSku}','${dopSku}',this)">+ Добавить</button>`;
+      } else if(isExtra){
+        bgs.push(`<span class="di-extra-lbl">лишний</span>`);
+        if(currentUser)
+          action = `<button class="di-rm-btn" onclick="event.stopPropagation();ckRemove('${mainSku}','${dopSku}',this)">Убрать</button>`;
+      } else {
+        if(currentUser)
+          action = `<button class="di-rm-btn" onclick="event.stopPropagation();openRmDupModal('${mainSku}','${dopSku}')">Убрать</button>`;
+      }
+
+      const rowCls = isMissing ? ' di-missing' : isExtra ? ' di-extra' : '';
+      html += `<div class="di${rowCls}" onclick="event.stopPropagation();cpTxt('${dopSku}',this.querySelector('.di-sku'))">
+        ${phEl}
+        <div class="di-info">
+          <div class="di-title">${dtitle}</div>
+          <div class="di-sku">${dopSku}</div>
+          <div class="di-badges">${bgs.join('')}</div>
+        </div>
+        ${action}
+      </div>`;
+    });
+    html += '</div>';
+    return html;
+  }
+
+  card.innerHTML = `
+    ${phHtml}
+    <div class="cb">
+      ${brand ? `<div class="cb-brand">${brand}</div>` : ''}
+      <div class="cb-title">${title}</div>
+      <div class="cb-row">${price}${stock}</div>
+      <div class="cb-skus">
+        <span class="sku sku-main" onclick="event.stopPropagation();cpTxt('${mainSku}',this)">${mainSku}</span>
+      </div>
+      ${diffBadges.length ? `<div class="cb-flags" style="margin-top:4px">${diffBadges.join(' ')}</div>` : ''}
     </div>
-    <div class="ck-mid">→</div>
-    <div class="ck-right">
-      <div class="ck-name">${dupName}</div>
-      <div class="ck-sku">${dup}</div>
+    <div class="cf">
+      <div class="cf-left">Дублей в базе: <b>${dopCount}</b></div>
+      <div class="cf-right">
+        ${shopLink ? `<a class="klink" href="${shopLink}" target="_blank" onclick="event.stopPropagation()">Kaspi →</a>` : ''}
+        <button class="exp-btn" onclick="event.stopPropagation();this.closest('.card').classList.toggle('expanded')">
+          Дубли <svg class="exp-ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      </div>
     </div>
-    <div class="ck-actions">${btns}</div>
-  </div>`;
+    <div class="dp"><div class="dp-inner">${buildCkDp()}</div></div>`;
+
+  card.addEventListener('click', () => card.classList.toggle('expanded'));
+  return card;
 }
 
 async function loadComparison(){
@@ -1255,71 +1336,84 @@ async function loadComparison(){
   try {
     const r = await fetch('/api/comparison', {cache:'no-store'});
     if(!r.ok) throw new Error(r.status);
-    const d = await r.json();
-    const missing = d.missing_in_vps || [];
-    const extra   = d.extra_in_vps   || [];
-
-    document.getElementById('ckMissingBadge').textContent = missing.length;
-    document.getElementById('ckExtraBadge').textContent   = extra.length;
-
-    const totalPending = missing.length + extra.length;
-    const badge = document.getElementById('checkTabBadge');
-    if(totalPending > 0){
-      badge.textContent = totalPending;
-      badge.style.display = '';
-    }
-
-    const mList = missing.map(([m,d],i)=>renderCkRow(m,d,'missing',i)).join('') ||
-      '<div class="check-empty">Всё в порядке — нет отсутствующих дублей</div>';
-    const eList = extra.map(([m,d],i)=>renderCkRow(m,d,'extra',i)).join('') ||
-      '<div class="check-empty">Всё в порядке — нет лишних дублей</div>';
-
-    document.getElementById('ckMissingList').innerHTML = mList;
-    document.getElementById('ckExtraList').innerHTML   = eList;
-
-    document.getElementById('ckLoad').style.display    = 'none';
-    document.getElementById('ckContent').style.display = '';
+    _ckData = await r.json();
+    renderComparison();
   } catch(e) {
     document.getElementById('ckLoad').textContent = 'Ошибка загрузки: ' + e;
   }
 }
 
-async function ckAdd(main, dup, rowId){
-  if(!currentUser){ alert('Войдите для редактирования'); return; }
-  const ok = await apiAction({action:'add_dup', main_sku:main, new_sku:dup});
-  if(ok){
-    _ckDone.add(rowId);
-    const row = document.getElementById(rowId);
-    if(row){
-      row.classList.add('done');
-      row.querySelector('.ck-actions').innerHTML = '<span class="ckbtn ckbtn-done">Добавлено</span>';
-    }
-  }
+function renderComparison(){
+  const d = _ckData;
+  const missing = d.missing_in_vps || [];  // [[main,dup],...]
+  const extra   = d.extra_in_vps   || [];
+
+  // Tab badge
+  const total = missing.length + extra.length;
+  const badge = document.getElementById('checkTabBadge');
+  badge.textContent = total;
+  badge.style.display = total ? '' : 'none';
+
+  // Group by main_sku
+  const missMap  = {};  // main → Set of dups to add
+  const extraMap = {};  // main → Set of dups to remove
+  missing.forEach(([m,d]) => { missMap[m]  = missMap[m]  || new Set(); missMap[m].add(d); });
+  extra.forEach(  ([m,d]) => { extraMap[m] = extraMap[m] || new Set(); extraMap[m].add(d); });
+
+  const missMainSkus  = Object.keys(missMap);
+  const extraMainSkus = Object.keys(extraMap);
+
+  // Missing section
+  const missBar  = document.getElementById('ckMissBar');
+  const missGrid = document.getElementById('ckMissGrid');
+  missBar.style.display  = missMainSkus.length ? '' : 'none';
+  document.getElementById('ckMissCnt').textContent = missing.length;
+  missGrid.innerHTML = '';
+  missMainSkus.forEach(mainSku => {
+    missGrid.appendChild(buildCkCard(mainSku, missMap[mainSku], extraMap[mainSku] || new Set(), 'ckMissGrid'));
+  });
+
+  // Extra section
+  const extraBar  = document.getElementById('ckExtraBar');
+  const extraGrid = document.getElementById('ckExtraGrid');
+  // Only show main SKUs that are NOT already in missMap (avoid duplicates)
+  const extraOnly = extraMainSkus.filter(s => !missMap[s]);
+  extraBar.style.display  = extraOnly.length ? '' : 'none';
+  document.getElementById('ckExtraCnt').textContent = extra.filter(([m])=>!missMap[m]).length;
+  extraGrid.innerHTML = '';
+  extraOnly.forEach(mainSku => {
+    extraGrid.appendChild(buildCkCard(mainSku, new Set(), extraMap[mainSku], 'ckExtraGrid'));
+  });
+
+  document.getElementById('ckInfo').textContent =
+    `${missMainSkus.length} карточек с недостающими дублями · ${extraMainSkus.length} карточек с лишними дублями`;
+
+  document.getElementById('ckLoad').style.display    = 'none';
+  document.getElementById('ckContent').style.display = '';
 }
 
-async function ckRemove(main, dup, rowId){
+async function ckAdd(mainSku, dupSku, btn){
   if(!currentUser){ alert('Войдите для редактирования'); return; }
-  const ok = await apiAction({action:'remove_dup', main_sku:main, dop_sku:dup, choice:'standalone'});
+  btn.disabled = true; btn.textContent = '...';
+  const ok = await apiAction({action:'add_dup', main_sku:mainSku, new_sku:dupSku});
   if(ok){
-    _ckDone.add(rowId);
-    const row = document.getElementById(rowId);
-    if(row){
-      row.classList.add('done');
-      row.querySelector('.ck-actions').innerHTML = '<span class="ckbtn ckbtn-done">Убрано</span>';
-    }
-  }
+    btn.textContent = '✓ Добавлено';
+    btn.style.cssText = 'background:#d8f3dc;color:#2d6a4f;border-color:#95d5a5';
+    const row = btn.closest('.di');
+    if(row){ row.classList.remove('di-missing'); }
+  } else { btn.disabled = false; btn.textContent = '+ Добавить'; }
 }
 
-async function ckModerate(main, rowId){
+async function ckRemove(mainSku, dupSku, btn){
   if(!currentUser){ alert('Войдите для редактирования'); return; }
-  const ok = await apiAction({action:'set_flag', main_sku:main, flag:'needs_moderation'});
+  btn.disabled = true; btn.textContent = '...';
+  const ok = await apiAction({action:'remove_dup', main_sku:mainSku, dop_sku:dupSku, choice:'standalone'});
   if(ok){
-    const row = document.getElementById(rowId);
-    if(row){
-      const modBtn = row.querySelector('.ckbtn-mod');
-      if(modBtn){ modBtn.textContent = 'На модерации'; modBtn.classList.add('ckbtn-done'); modBtn.disabled = true; }
-    }
-  }
+    btn.textContent = '✓ Убрано';
+    btn.style.cssText = 'background:var(--gry-bg);color:var(--gry);border-color:var(--brd)';
+    const row = btn.closest('.di');
+    if(row){ row.style.opacity = '.35'; }
+  } else { btn.disabled = false; btn.textContent = 'Убрать'; }
 }
 
 // ══ INIT ══════════════════════════════════════════════════════════
