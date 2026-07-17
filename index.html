@@ -439,6 +439,36 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 /* ══ BARCODE + NAME_DUP BANNER ══════════════════════════════════ */
 .sku-bar{background:#f3f0ff;color:#7950f2;cursor:pointer}
 .nd-banner{background:#fff3bf;border:1.5px solid #f6d860;border-radius:var(--r);padding:10px 16px;margin-bottom:12px;font-size:.8rem;color:#92660a;line-height:1.5}
+
+/* ══ TAB NAV ════════════════════════════════════════════════════ */
+.tab-nav{display:flex;gap:3px;padding:8px 22px 0;border-top:1px solid rgba(255,255,255,.1)}
+.tab-btn{padding:6px 16px;border-radius:8px 8px 0 0;border:none;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);cursor:pointer;font-size:.79rem;font-weight:600;transition:all .15s}
+.tab-btn.active{background:rgba(255,255,255,.22);color:#fff}
+.tab-btn:hover:not(.active){background:rgba(255,255,255,.16)}
+.tab-badge{display:inline-block;background:var(--acc);color:#fff;border-radius:20px;padding:1px 6px;font-size:.66rem;margin-left:4px;vertical-align:middle}
+
+/* ══ ПРОВЕРКА VIEW ══════════════════════════════════════════════ */
+.check-view{display:none;padding:20px 22px;max-width:1100px;margin:0 auto;width:100%}
+.check-view.show{display:block}
+.check-sec{margin-bottom:28px}
+.check-sec-hd{font-size:.84rem;font-weight:800;color:var(--txt);margin-bottom:10px;display:flex;align-items:center;gap:8px;padding:0 2px}
+.ck-badge{background:var(--acc);color:#fff;border-radius:20px;padding:2px 9px;font-size:.72rem;font-weight:700}
+.ck-badge.grn{background:var(--grn)}
+.ck-row{background:#fff;border-radius:10px;box-shadow:var(--sh);margin-bottom:8px;padding:10px 14px;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.ck-row.done{opacity:.45}
+.ck-left{flex:1;min-width:180px}
+.ck-mid{display:flex;align-items:center;font-size:1.1rem;color:var(--gry);padding-top:4px;flex-shrink:0}
+.ck-right{flex:1;min-width:180px}
+.ck-name{font-size:.8rem;font-weight:700;color:var(--txt);line-height:1.3}
+.ck-sku{font-family:monospace;font-size:.68rem;color:var(--gry);margin-top:2px}
+.ck-actions{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap;align-items:flex-start;padding-top:2px;flex-shrink:0}
+.ckbtn{padding:5px 11px;border-radius:14px;border:none;cursor:pointer;font-size:.74rem;font-weight:700;transition:all .15s;white-space:nowrap}
+.ckbtn-add{background:var(--grn-bg);color:var(--grn)}.ckbtn-add:hover{background:var(--grn);color:#fff}
+.ckbtn-rm{background:#fff5f5;color:var(--acc)}.ckbtn-rm:hover{background:var(--acc);color:#fff}
+.ckbtn-mod{background:var(--yel-bg);color:var(--yel)}.ckbtn-mod:hover{background:var(--yel);color:#fff}
+.ckbtn-done{background:var(--gry-bg);color:var(--gry);text-decoration:line-through;cursor:default}
+.check-empty{text-align:center;padding:30px;color:var(--grn);font-weight:700;font-size:.88rem}
+.check-load{text-align:center;padding:40px;color:var(--gry);font-size:.85rem}
 </style>
 </head>
 <body>
@@ -538,6 +568,10 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
       <option value="brand">По бренду</option>
     </select>
   </div>
+  <div class="tab-nav">
+    <button class="tab-btn active" id="tabMain" onclick="switchTab('main')">База товаров</button>
+    <button class="tab-btn" id="tabCheck" onclick="switchTab('check')">Проверка <span class="tab-badge" id="checkTabBadge" style="display:none">0</span></button>
+  </div>
 </header>
 
 <!-- ══ BRAND CAROUSEL ══ -->
@@ -572,6 +606,27 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none"><div class="ico"></div><h3>Ничего не найдено</h3></div>
 </main>
+
+<!-- ══ ПРОВЕРКА VIEW ══ -->
+<div class="check-view" id="checkView">
+  <div class="check-load" id="ckLoad">Загружаю данные сравнения...</div>
+  <div id="ckContent" style="display:none">
+    <div class="check-sec">
+      <div class="check-sec-hd">
+        Отсутствуют в базе — нужно добавить дубль
+        <span class="ck-badge" id="ckMissingBadge">0</span>
+      </div>
+      <div id="ckMissingList"></div>
+    </div>
+    <div class="check-sec">
+      <div class="check-sec-hd">
+        Лишние в базе — нужно убрать дубль
+        <span class="ck-badge" id="ckExtraBadge">0</span>
+      </div>
+      <div id="ckExtraList"></div>
+    </div>
+  </div>
+</div>
 
 <script>
 // ══ AUTH ══════════════════════════════════════════════════════════
@@ -1146,6 +1201,125 @@ function cpTxt(txt,el){
     el.textContent='✓ скопировано';
     setTimeout(()=>el.textContent=orig,1200);
   });
+}
+
+// ══ ПРОВЕРКА TAB ══════════════════════════════════════════════════
+let _ckLoaded = false;
+let _ckDone   = new Set(); // SKUs already acted on this session
+
+function switchTab(tab){
+  const isMain = tab === 'main';
+  document.getElementById('tabMain').classList.toggle('active', isMain);
+  document.getElementById('tabCheck').classList.toggle('active', !isMain);
+  document.querySelector('main').style.display         = isMain ? '' : 'none';
+  document.getElementById('carouselSection').style.display = isMain ? '' : 'none';
+  document.getElementById('catSection').style.display       = isMain ? '' : 'none';
+  document.getElementById('checkView').classList.toggle('show', !isMain);
+  if(!isMain && !_ckLoaded) loadComparison();
+}
+
+function ckName(sku){
+  const rec = DATA.find(r=>r.main_sku===sku);
+  if(!rec) return '';
+  return (rec.catalog_info?.title || rec.name || '').slice(0,60);
+}
+
+function renderCkRow(main, dup, type, idx){
+  const mainName = ckName(main) || main;
+  const dupName  = ckName(dup)  || dup;
+  const id       = `ckrow_${type}_${idx}`;
+  const doneClass = _ckDone.has(id) ? ' done' : '';
+  let btns = '';
+  if(type==='missing'){
+    btns = `<button class="ckbtn ckbtn-add" onclick="ckAdd('${main}','${dup}','${id}')">+ Добавить дубль</button>`;
+  } else {
+    btns = `<button class="ckbtn ckbtn-rm"  onclick="ckRemove('${main}','${dup}','${id}')">Убрать дубль</button>`;
+  }
+  btns += ` <button class="ckbtn ckbtn-mod" onclick="ckModerate('${main}','${id}')">На модерацию</button>`;
+  return `<div class="ck-row${doneClass}" id="${id}">
+    <div class="ck-left">
+      <div class="ck-name">${mainName}</div>
+      <div class="ck-sku">${main}</div>
+    </div>
+    <div class="ck-mid">→</div>
+    <div class="ck-right">
+      <div class="ck-name">${dupName}</div>
+      <div class="ck-sku">${dup}</div>
+    </div>
+    <div class="ck-actions">${btns}</div>
+  </div>`;
+}
+
+async function loadComparison(){
+  _ckLoaded = true;
+  try {
+    const r = await fetch('/api/comparison', {cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const missing = d.missing_in_vps || [];
+    const extra   = d.extra_in_vps   || [];
+
+    document.getElementById('ckMissingBadge').textContent = missing.length;
+    document.getElementById('ckExtraBadge').textContent   = extra.length;
+
+    const totalPending = missing.length + extra.length;
+    const badge = document.getElementById('checkTabBadge');
+    if(totalPending > 0){
+      badge.textContent = totalPending;
+      badge.style.display = '';
+    }
+
+    const mList = missing.map(([m,d],i)=>renderCkRow(m,d,'missing',i)).join('') ||
+      '<div class="check-empty">Всё в порядке — нет отсутствующих дублей</div>';
+    const eList = extra.map(([m,d],i)=>renderCkRow(m,d,'extra',i)).join('') ||
+      '<div class="check-empty">Всё в порядке — нет лишних дублей</div>';
+
+    document.getElementById('ckMissingList').innerHTML = mList;
+    document.getElementById('ckExtraList').innerHTML   = eList;
+
+    document.getElementById('ckLoad').style.display    = 'none';
+    document.getElementById('ckContent').style.display = '';
+  } catch(e) {
+    document.getElementById('ckLoad').textContent = 'Ошибка загрузки: ' + e;
+  }
+}
+
+async function ckAdd(main, dup, rowId){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  const ok = await apiAction({action:'add_dup', main_sku:main, new_sku:dup});
+  if(ok){
+    _ckDone.add(rowId);
+    const row = document.getElementById(rowId);
+    if(row){
+      row.classList.add('done');
+      row.querySelector('.ck-actions').innerHTML = '<span class="ckbtn ckbtn-done">Добавлено</span>';
+    }
+  }
+}
+
+async function ckRemove(main, dup, rowId){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  const ok = await apiAction({action:'remove_dup', main_sku:main, dop_sku:dup, choice:'standalone'});
+  if(ok){
+    _ckDone.add(rowId);
+    const row = document.getElementById(rowId);
+    if(row){
+      row.classList.add('done');
+      row.querySelector('.ck-actions').innerHTML = '<span class="ckbtn ckbtn-done">Убрано</span>';
+    }
+  }
+}
+
+async function ckModerate(main, rowId){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  const ok = await apiAction({action:'set_flag', main_sku:main, flag:'needs_moderation'});
+  if(ok){
+    const row = document.getElementById(rowId);
+    if(row){
+      const modBtn = row.querySelector('.ckbtn-mod');
+      if(modBtn){ modBtn.textContent = 'На модерации'; modBtn.classList.add('ckbtn-done'); modBtn.disabled = true; }
+    }
+  }
 }
 
 // ══ INIT ══════════════════════════════════════════════════════════
