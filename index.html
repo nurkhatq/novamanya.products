@@ -1043,7 +1043,7 @@ function buildCard(item,idx){
   const isKO=item.source==='kaspi_only';
   const hasDups=item.dop_skus?.length>0;
   const isSingle=item.flags?.includes('single_component');
-  const hasContent=hasDups||isSingle||(item.ms_type==='Комплект'&&item.components?.length);
+  const hasContent=hasDups||isSingle||item.components?.length||!!currentUser;
   const canExp=hasContent||!!currentUser;
 
   const card=document.createElement('div');
@@ -1197,56 +1197,77 @@ function selectComp(mainSku,sku,name){
   if(res) res.style.display='none';
 }
 
+function buildCompRows(comps, mainSku){
+  const nm=getNameMap();
+  return comps.map(c=>{
+    const {name,qty}=parseComp(c);
+    const rec=nm[name]||{};
+    const cat=rec.catalog_info||{};
+    const ph=cat.photos?.[0]||'';
+    const sku=rec.main_sku||'';
+    const art=rec.article||'';
+    const phEl=ph
+      ?`<img class="ci-ph" src="${ph}" alt="" loading="lazy">`
+      :`<div class="ci-ph-ph"></div>`;
+    const skuEl=sku
+      ?`<span class="ci-sku" onclick="event.stopPropagation();cpTxt('${sku}',this)" title="Скопировать SKU">${sku}</span>`
+      :'';
+    const artEl=art?`<span class="ci-art">Арт: ${art}</span>`:'';
+    const qtyEl=qty!==1?`<span class="ci-qty">×${qty%1===0?qty:qty.toFixed(1)}</span>`:'';
+    const pr=cat.price?`<span class="dbadge db-p" style="font-size:.6rem">${cat.price.toLocaleString('ru')} ₸</span>`:'';
+    const st=cat.status==='active'?`<span class="dbadge db-a" style="font-size:.6rem">Активный</span>`
+             :cat.status==='inactive'?`<span class="dbadge db-i" style="font-size:.6rem">Неактивный</span>`:'';
+    const rmComp=currentUser
+      ?`<button class="ci-rm" onclick="event.stopPropagation();rmComp('${mainSku}','${c.replace(/'/g,"\\'")}')">✕</button>`
+      :'';
+    return `<div class="ci">${phEl}<div class="ci-info">
+      <div class="ci-title">${name}</div>
+      <div class="ci-meta">${skuEl}${artEl}${qtyEl}${pr}${st}</div>
+    </div>${rmComp}</div>`;
+  }).join('');
+}
+
+function buildCompAddInput(mainSku){
+  return `<div class="comp-add-row" style="align-items:flex-start">
+    <div class="comp-search-wrap" id="csw_${mainSku}">
+      <input class="dp-add-inp" id="csi_${mainSku}" type="text"
+        placeholder="Поиск по названию или SKU..."
+        onclick="event.stopPropagation()"
+        oninput="event.stopPropagation();onCompInput('${mainSku}',this.value)"
+        onkeydown="event.stopPropagation();if(event.key==='Enter')doAddComp('${mainSku}')">
+      <div class="comp-search-res" id="csr_${mainSku}" style="display:none"></div>
+    </div>
+    <button class="dp-add-btn" onclick="event.stopPropagation();doAddComp('${mainSku}')">+ Добавить</button>
+  </div>`;
+}
+
 function buildDp(item){
   let html='';
-  if(item.ms_type==='Комплект'){
-    const comps=item.components||[];
-    const nm=getNameMap();
-    const compRows=comps.map(c=>{
-      const {name,qty}=parseComp(c);
-      const rec=nm[name]||{};
-      const cat=rec.catalog_info||{};
-      const ph=cat.photos?.[0]||'';
-      const sku=rec.main_sku||'';
-      const art=rec.article||'';
-      const phEl=ph
-        ?`<img class="ci-ph" src="${ph}" alt="" loading="lazy">`
-        :`<div class="ci-ph-ph"></div>`;
-      const skuEl=sku
-        ?`<span class="ci-sku" onclick="event.stopPropagation();cpTxt('${sku}',this)" title="Скопировать SKU">${sku}</span>`
-        :'';
-      const artEl=art?`<span class="ci-art">Арт: ${art}</span>`:'';
-      const qtyEl=qty!==1?`<span class="ci-qty">×${qty%1===0?qty:qty.toFixed(1)}</span>`:'';
-      const pr=cat.price?`<span class="dbadge db-p" style="font-size:.6rem">${cat.price.toLocaleString('ru')} ₸</span>`:'';
-      const st=cat.status==='active'?`<span class="dbadge db-a" style="font-size:.6rem">Активный</span>`
-               :cat.status==='inactive'?`<span class="dbadge db-i" style="font-size:.6rem">Неактивный</span>`:'';
-      const rmComp=currentUser
-        ?`<button class="ci-rm" onclick="event.stopPropagation();rmComp('${item.main_sku}','${c.replace(/'/g,"\\'")}')">✕</button>`
-        :'';
-      return `<div class="ci">${phEl}<div class="ci-info">
-        <div class="ci-title">${name}</div>
-        <div class="ci-meta">${skuEl}${artEl}${qtyEl}${pr}${st}</div>
-      </div>${rmComp}</div>`;
-    }).join('');
-    const addComp=currentUser?`
-      <div class="comp-add-row" style="align-items:flex-start">
-        <div class="comp-search-wrap" id="csw_${item.main_sku}">
-          <input class="dp-add-inp" id="csi_${item.main_sku}" type="text"
-            placeholder="Поиск по названию или SKU..."
-            onclick="event.stopPropagation()"
-            oninput="event.stopPropagation();onCompInput('${item.main_sku}',this.value)"
-            onkeydown="event.stopPropagation();if(event.key==='Enter')doAddComp('${item.main_sku}')">
-          <div class="comp-search-res" id="csr_${item.main_sku}" style="display:none"></div>
-        </div>
-        <button class="dp-add-btn" onclick="event.stopPropagation();doAddComp('${item.main_sku}')">+ Добавить</button>
-      </div>`:'';
+  const comps=item.components||[];
+  const isBundle=item.ms_type==='Комплект';
+  const hasComps=comps.length>0;
+
+  if(isBundle||hasComps){
+    // Full visible component block
+    const label=isBundle?`Компоненты (${comps.length})`:`Компоненты (${comps.length}) · добавлено к товару`;
+    const addComp=currentUser?buildCompAddInput(item.main_sku):'';
     html+=`<div class="comp-blk">
-      <div class="comp-blk-t">
-        <span>Компоненты (${comps.length})</span>
+      <div class="comp-blk-t"><span>${label}</span></div>
+      ${buildCompRows(comps,item.main_sku)}${addComp}
+    </div>`;
+  } else if(currentUser){
+    // Regular Товар with no comps — collapsed "convert to bundle" section
+    const cid='cbx_'+item.main_sku.replace(/[^a-z0-9]/gi,'_');
+    html+=`<div class="comp-blk" style="background:#f0faf2;border:1px dashed #74c69d">
+      <div class="comp-blk-t" style="cursor:pointer;color:#2d6a4f"
+           onclick="event.stopPropagation();var b=document.getElementById('${cid}');b.style.display=b.style.display==='none'?'block':'none'">
+        <span>+ Сделать комплектом — добавить компоненты</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#2d6a4f" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      ${compRows}${addComp}
+      <div id="${cid}" style="display:none;margin-top:6px">${buildCompAddInput(item.main_sku)}</div>
     </div>`;
   }
+
   const addBlock=currentUser?`<div class="dp-add-row">
     <input class="dp-add-inp" id="dpa_${item.main_sku}" type="text" placeholder="SKU дубля для добавления" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.stopPropagation();addDop('${item.main_sku}',this.value)}">
     <button class="dp-add-btn" onclick="event.stopPropagation();addDop('${item.main_sku}',document.getElementById('dpa_${item.main_sku}').value)">+ Добавить</button>
