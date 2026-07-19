@@ -296,7 +296,12 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .comp-blk-t{font-size:.7rem;font-weight:700;color:var(--pur);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
 .comp-blk-i{font-size:.76rem;color:var(--txt2);padding:2px 0;display:flex;align-items:center;justify-content:space-between;gap:6px}
 .comp-rm-btn{background:none;border:none;color:#ccc;font-size:.7rem;cursor:pointer;padding:0 2px;flex-shrink:0}.comp-rm-btn:hover{color:var(--acc)}
-.comp-add-row{display:flex;gap:6px;margin-top:6px}
+.comp-add-row{display:flex;gap:6px;margin-top:6px;align-items:flex-start}
+.comp-qty-inp{width:62px;padding:6px 8px;border:1.5px solid var(--brd);border-radius:8px;font-size:.82rem;outline:none;text-align:center;flex-shrink:0}
+.comp-qty-inp:focus{border-color:var(--pur)}
+.ci-qty{cursor:pointer;user-select:none}
+.ci-qty:hover{background:#7950f2;color:#fff}
+.ci-qty-edit{width:44px;padding:2px 4px;border:1.5px solid #9775fa;border-radius:6px;font-size:.7rem;text-align:center;outline:none;background:#fff;color:#7950f2;font-weight:700}
 /* Rich component item */
 .ci{display:flex;gap:8px;background:#fff;border-radius:var(--rs);padding:7px 8px;border:1px solid #d0bfff;align-items:flex-start;margin-bottom:5px;position:relative}
 .ci-ph{width:52px;height:52px;border-radius:5px;object-fit:contain;background:#f0f4f8;flex-shrink:0}
@@ -1189,12 +1194,20 @@ function onCompInput(mainSku,val){
   }).join('');
 }
 function selectComp(mainSku,sku,name){
-  // Store as "Name (x1.0)" — same format as existing components
-  const val=name+' (x1.0)';
   document.getElementById('csi_'+mainSku).value=name;
-  document.getElementById('csi_'+mainSku).dataset.selVal=val;
+  document.getElementById('csi_'+mainSku).dataset.selName=name;
   const res=document.getElementById('csr_'+mainSku);
   if(res) res.style.display='none';
+  document.getElementById('cqty_'+mainSku)?.focus();
+}
+function getCompVal(mainSku){
+  const inp=document.getElementById('csi_'+mainSku);
+  const qtyInp=document.getElementById('cqty_'+mainSku);
+  const name=(inp?.dataset.selName||inp?.value||'').trim();
+  if(!name) return null;
+  const qty=Math.max(1,parseFloat(qtyInp?.value)||1);
+  const qtyStr=qty%1===0?qty+'.0':qty.toFixed(1);
+  return name+' (x'+qtyStr+')';
 }
 
 function buildCompRows(comps, mainSku){
@@ -1213,7 +1226,10 @@ function buildCompRows(comps, mainSku){
       ?`<span class="ci-sku" onclick="event.stopPropagation();cpTxt('${sku}',this)" title="Скопировать SKU">${sku}</span>`
       :'';
     const artEl=art?`<span class="ci-art">Арт: ${art}</span>`:'';
-    const qtyEl=qty!==1?`<span class="ci-qty">×${qty%1===0?qty:qty.toFixed(1)}</span>`:'';
+    const qtyDisplay=qty%1===0?qty:qty.toFixed(1);
+    const qtyEl=currentUser
+      ?`<span class="ci-qty" title="Изменить количество" onclick="event.stopPropagation();editCompQty(this,'${mainSku}','${c.replace(/'/g,"\\'")}',${qty})">×${qtyDisplay}</span>`
+      :(qty!==1?`<span class="ci-qty">×${qtyDisplay}</span>`:'');
     const pr=cat.price?`<span class="dbadge db-p" style="font-size:.6rem">${cat.price.toLocaleString('ru')} ₸</span>`:'';
     const st=cat.status==='active'?`<span class="dbadge db-a" style="font-size:.6rem">Активный</span>`
              :cat.status==='inactive'?`<span class="dbadge db-i" style="font-size:.6rem">Неактивный</span>`:'';
@@ -1227,8 +1243,32 @@ function buildCompRows(comps, mainSku){
   }).join('');
 }
 
+async function editCompQty(badge, mainSku, oldComp, currentQty){
+  const inp=document.createElement('input');
+  inp.type='number'; inp.min='1'; inp.value=currentQty;
+  inp.className='ci-qty-edit';
+  inp.onclick=e=>e.stopPropagation();
+  badge.replaceWith(inp);
+  inp.focus(); inp.select();
+  async function commit(){
+    const newQty=Math.max(1,parseFloat(inp.value)||1);
+    if(newQty===currentQty){ await refreshFromServer(); return; }
+    const {name}=parseComp(oldComp);
+    const qtyStr=newQty%1===0?newQty+'.0':newQty.toFixed(1);
+    const newComp=name+' (x'+qtyStr+')';
+    const ok1=await apiAction({action:'remove_component',main_sku:mainSku,comp_name:oldComp});
+    if(ok1){
+      const ok2=await apiAction({action:'add_component',main_sku:mainSku,comp_name:newComp});
+      if(ok2){ _nameMap=null; await refreshFromServer(); return; }
+    }
+    await refreshFromServer();
+  }
+  inp.onblur=commit;
+  inp.onkeydown=e=>{ e.stopPropagation(); if(e.key==='Enter') inp.blur(); if(e.key==='Escape') refreshFromServer(); };
+}
+
 function buildCompAddInput(mainSku){
-  return `<div class="comp-add-row" style="align-items:flex-start">
+  return `<div class="comp-add-row">
     <div class="comp-search-wrap" id="csw_${mainSku}">
       <input class="dp-add-inp" id="csi_${mainSku}" type="text"
         placeholder="Поиск по названию или SKU..."
@@ -1237,6 +1277,10 @@ function buildCompAddInput(mainSku){
         onkeydown="event.stopPropagation();if(event.key==='Enter')doAddComp('${mainSku}')">
       <div class="comp-search-res" id="csr_${mainSku}" style="display:none"></div>
     </div>
+    <input class="comp-qty-inp" id="cqty_${mainSku}" type="number" min="1" value="1"
+      title="Количество" placeholder="Кол-во"
+      onclick="event.stopPropagation()"
+      onkeydown="event.stopPropagation();if(event.key==='Enter')doAddComp('${mainSku}')">
     <button class="dp-add-btn" onclick="event.stopPropagation();doAddComp('${mainSku}')">+ Добавить</button>
   </div>`;
 }
@@ -1313,14 +1357,13 @@ function tog(e,idx){
 }
 
 async function doAddComp(mainSku){
-  const inp=document.getElementById('csi_'+mainSku);
-  if(!inp) return;
-  // Prefer the selected value from search (has qty suffix), else use typed text
-  const val=(inp.dataset.selVal||inp.value).trim();
+  const val=getCompVal(mainSku);
   if(!val) return;
-  inp.dataset.selVal='';
-  inp.value='';
+  const inp=document.getElementById('csi_'+mainSku);
+  if(inp){ inp.value=''; inp.dataset.selName=''; }
   document.getElementById('csr_'+mainSku).style.display='none';
+  const qtyInp=document.getElementById('cqty_'+mainSku);
+  if(qtyInp) qtyInp.value='1';
   const ok=await apiAction({action:'add_component',main_sku:mainSku,comp_name:val});
   if(ok){ _nameMap=null; await refreshFromServer(); }
 }
