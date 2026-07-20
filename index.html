@@ -1316,7 +1316,23 @@ function onCompInput(mainSku,val){
   const res=document.getElementById('csr_'+mainSku);
   if(!res) return;
   const items=compSearchItems(val);
-  if(!items.length){res.innerHTML='<div class="rda-empty">Ничего не найдено</div>';res.style.display=val.length>1?'block':'none';return;}
+  if(!items.length){
+    const q=val.trim();
+    const isSku=/^\d{5,}/.test(q);
+    if(q.length>1){
+      res.style.display='block';
+      res.innerHTML = isSku
+        ? `<div class="rda-item" onclick="fetchKaspiForComp('${mainSku}','${q}')">
+            <div class="comp-si-ph" style="background:#e8f0fe;font-size:.9rem;display:flex;align-items:center;justify-content:center;color:var(--blue);font-weight:800">K</div>
+            <div class="comp-si-info">
+              <div class="comp-si-name" style="color:var(--blue)">Найти в Kaspi: ${q}</div>
+              <div style="font-size:.68rem;color:var(--gry)">Создать новую карточку из Kaspi</div>
+            </div>
+          </div>`
+        : '<div class="rda-empty">Ничего не найдено</div>';
+    } else { res.style.display='none'; }
+    return;
+  }
   res.style.display='block';
   res.innerHTML=items.map(r=>{
     const cat=r.catalog_info||{};
@@ -1781,6 +1797,51 @@ async function ckRemove(mainSku, dupSku, btn){
 let _afType = 'Товар';
 let _afComps = [];  // [{name, qty}]
 let _afDups  = [];  // [{sku, name}]
+
+async function fetchKaspiForComp(mainSku, sku){
+  const res = document.getElementById('csr_'+mainSku);
+  if(res) res.innerHTML='<div class="rda-empty" style="color:var(--blue)">Загружаю из Kaspi...</div>';
+
+  try {
+    const r = await fetch(`/api/kaspi-sku/${encodeURIComponent(sku)}`);
+    const d = await r.json();
+    if(!r.ok || d.error){
+      if(res) res.innerHTML=`<div class="rda-empty" style="color:var(--acc)">✗ ${d.error||'Не найдено'}</div>`;
+      return;
+    }
+
+    // Create card if not already in base
+    if(!DATA.find(item=>item&&item.main_sku===sku)){
+      const record = {
+        main_sku: sku,
+        name: d.title,
+        ms_type: 'Товар',
+        article: d.article||null,
+        source: 'auto_from_kaspi',
+        flags: ['new_card'],
+        dop_skus: [],
+        components: [],
+        comp_count: null,
+        brand: d.brand||null,
+        catalog_info: { title: d.title, photos: d.photos||[], price: null, status: null },
+      };
+      const ok = await apiAction({action:'add_product', record});
+      if(!ok){
+        if(res) res.innerHTML='<div class="rda-empty" style="color:var(--acc)">✗ Не удалось создать карточку</div>';
+        return;
+      }
+      await refreshFromServer();
+      _nameMap = null;
+    }
+
+    // Select the comp
+    selectComp(mainSku, sku, d.title);
+    if(res) res.style.display='none';
+
+  } catch(e) {
+    if(res) res.innerHTML=`<div class="rda-empty" style="color:var(--acc)">✗ Ошибка сети</div>`;
+  }
+}
 
 async function fetchKaspiSku(){
   const sku = document.getElementById('af_kaspi_sku').value.trim();
