@@ -1633,7 +1633,7 @@ function renderNewView(){
   g.innerHTML = '';
   if(!items.length){ g.innerHTML='<div style="color:var(--gry);padding:32px;text-align:center">Новых карточек нет</div>'; return; }
   const frag = document.createDocumentFragment();
-  items.forEach((item,i) => frag.appendChild(buildCard(item, i)));
+  items.forEach((item,i) => frag.appendChild(buildCard(item, 100000 + i)));
   g.appendChild(frag);
 }
 
@@ -1653,7 +1653,7 @@ function renderNocatView(){
   g.innerHTML = '';
   if(!items.length){ g.innerHTML='<div style="color:var(--gry);padding:32px;text-align:center">Все товары есть на Kaspi</div>'; return; }
   const frag = document.createDocumentFragment();
-  items.forEach((item,i) => frag.appendChild(buildCard(item, i)));
+  items.forEach((item,i) => frag.appendChild(buildCard(item, 200000 + i)));
   g.appendChild(frag);
 }
 
