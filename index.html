@@ -1799,17 +1799,18 @@ async function fetchKaspiSku(){
       return;
     }
     document.getElementById('af_sku').value = sku;
-    if(d.title)     document.getElementById('af_name').value    = d.title;
-    if(d.brand)     document.getElementById('af_brand').value   = d.brand;
-    if(d.price)     document.getElementById('af_price').value   = d.price;
-    if(d.article)   document.getElementById('af_article').value = d.article;
-    if(d.photo_url){
-      const ta = document.getElementById('af_photos');
-      ta.value = d.photo_url;
+    if(d.title)   document.getElementById('af_name').value    = d.title;
+    if(d.brand)   document.getElementById('af_brand').value   = d.brand;
+    if(d.price)   document.getElementById('af_price').value   = d.price;
+    if(d.article) document.getElementById('af_article').value = d.article;
+    const photos = d.photos?.length ? d.photos : (d.photo_url ? [d.photo_url] : []);
+    if(photos.length){
+      document.getElementById('af_photos').value = photos.join('\n');
       updatePhotoPrev();
     }
+    const photoCount = photos.length ? ` · ${photos.length} фото` : '';
     statusEl.style.color = 'var(--grn)';
-    statusEl.textContent = '✓ ' + (d.title || sku);
+    statusEl.textContent = '✓ ' + (d.title || sku) + photoCount;
   } catch(e) {
     statusEl.style.color = 'var(--acc)';
     statusEl.textContent = '✗ Ошибка сети';
