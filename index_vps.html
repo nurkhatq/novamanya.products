@@ -1757,12 +1757,13 @@ async function renderNocatView(){
   const g = document.getElementById('nocatGrid');
   g.innerHTML = '';
   if(!items.length){ g.innerHTML='<div style="color:var(--gry);padding:32px;text-align:center">Все товары есть на Kaspi</div>'; return; }
-  // prefix → [records] map for cross-DB lookup (all records, including other nocat)
+  // prefix → [records] map: index by main_sku AND dop_skus prefixes
   const prefixToRecords = {};
+  const addToMap = (pfx, r) => (prefixToRecords[pfx] = prefixToRecords[pfx] || []).push(r);
   DATA.forEach(r => {
     if(!r) return;
-    const pfx = r.main_sku.split('_')[0];
-    (prefixToRecords[pfx] = prefixToRecords[pfx] || []).push(r);
+    addToMap(r.main_sku.split('_')[0], r);
+    (r.dop_skus || []).forEach(d => addToMap(d.split('_')[0], r));
   });
 
   const frag = document.createDocumentFragment();
