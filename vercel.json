@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "http://194.238.41.18/products/api/:path*"
+      "source": "/api/:path((?!kaspi-sku(?:\\/|$)).*)",
+      "destination": "http://194.238.41.18/products/api/:path"
     }
   ]
 }
