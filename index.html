@@ -475,6 +475,43 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .tab-btn:hover:not(.active){background:rgba(255,255,255,.16)}
 .tab-badge{display:inline-block;background:var(--acc);color:#fff;border-radius:20px;padding:1px 6px;font-size:.66rem;margin-left:4px;vertical-align:middle}
 
+/* ══ ДОБАВИТЬ ТОВАР VIEW ════════════════════════════════════════ */
+.add-view{display:none;padding:24px 22px;max-width:720px;margin:0 auto;width:100%}
+.add-view.show{display:block}
+.add-card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:24px 28px}
+.add-card h2{font-size:1rem;font-weight:800;color:var(--txt);margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.add-field{margin-bottom:14px}
+.add-label{font-size:.75rem;font-weight:700;color:var(--gry);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;display:block}
+.add-inp{width:100%;padding:9px 13px;border:1.5px solid var(--brd);border-radius:9px;font-size:.88rem;outline:none;color:var(--txt);transition:border-color .15s}
+.add-inp:focus{border-color:var(--blue)}
+.add-inp.err{border-color:var(--acc)}
+.add-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.add-type-row{display:flex;gap:8px}
+.add-type-btn{flex:1;padding:9px;border:1.5px solid var(--brd);border-radius:9px;background:#fff;color:var(--gry);font-size:.84rem;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
+.add-type-btn.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+.add-photos{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.add-ph-prev{width:72px;height:72px;border-radius:8px;object-fit:contain;background:#f0f4f8;border:1px solid var(--brd)}
+.add-ph-rm{position:relative;display:inline-block}
+.add-ph-rm-btn{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--acc);color:#fff;border:none;cursor:pointer;font-size:.6rem;line-height:16px;text-align:center;padding:0}
+.add-ph-add{width:72px;height:72px;border-radius:8px;border:1.5px dashed var(--brd);background:#f7f8fa;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--gry);transition:all .15s}
+.add-ph-add:hover{border-color:var(--blue);color:var(--blue)}
+.add-brand-wrap{position:relative}
+.add-brand-res{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--blue);border-radius:9px;margin-top:3px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:var(--sh2);display:none}
+.add-brand-item{padding:8px 12px;cursor:pointer;font-size:.84rem;border-bottom:1px solid var(--brd)}
+.add-brand-item:last-child{border-bottom:none}
+.add-brand-item:hover{background:#f0f4f8}
+.add-brand-new{color:var(--blue);font-weight:700}
+.add-dups-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.add-dup-row{display:flex;align-items:center;gap:8px;background:#f7f8fa;border-radius:8px;padding:7px 10px;font-size:.78rem}
+.add-dup-name{flex:1;color:var(--txt);font-weight:600}
+.add-dup-sku{font-family:monospace;font-size:.68rem;color:var(--gry)}
+.add-dup-rm{background:none;border:none;color:var(--gry);cursor:pointer;font-size:.8rem}.add-dup-rm:hover{color:var(--acc)}
+.add-comps-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.add-submit{width:100%;padding:12px;border-radius:10px;background:#1d3557;color:#fff;border:none;cursor:pointer;font-size:.92rem;font-weight:700;margin-top:20px;transition:background .2s}
+.add-submit:hover{background:#2a6496}
+.add-submit:disabled{background:var(--gry);cursor:default}
+.add-success{text-align:center;padding:32px;color:var(--grn);font-size:.95rem;font-weight:700;display:none}
+
 /* ══ ПРОВЕРКА VIEW ══════════════════════════════════════════════ */
 .check-view{display:none;padding:18px 22px;max-width:1440px;margin:0 auto;width:100%}
 .check-view.show{display:block}
@@ -597,6 +634,7 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
   <div class="tab-nav">
     <button class="tab-btn active" id="tabMain" onclick="switchTab('main')">База товаров</button>
     <button class="tab-btn" id="tabCheck" onclick="switchTab('check')">Проверка <span class="tab-badge" id="checkTabBadge" style="display:none">0</span></button>
+    <button class="tab-btn" id="tabAdd" onclick="switchTab('add')">+ Добавить товар</button>
   </div>
 </header>
 
@@ -646,6 +684,89 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
       Нужно убрать дубль <span id="ckExtraCnt">0</span>
     </div>
     <div class="grid" id="ckExtraGrid"></div>
+  </div>
+</div>
+
+<!-- ══ ДОБАВИТЬ ТОВАР VIEW ══ -->
+<div class="add-view" id="addView">
+  <div class="add-card" id="addForm">
+    <h2>Новый товар <span style="font-size:.72rem;font-weight:600;color:var(--blue);background:var(--blue-bg);padding:2px 8px;border-radius:6px">тестовая база</span></h2>
+
+    <div class="add-row2">
+      <div class="add-field">
+        <label class="add-label">SKU *</label>
+        <input class="add-inp" id="af_sku" type="text" placeholder="123456789_987654321">
+      </div>
+      <div class="add-field">
+        <label class="add-label">Цена (₸)</label>
+        <input class="add-inp" id="af_price" type="number" min="0" placeholder="0">
+      </div>
+    </div>
+
+    <div class="add-field">
+      <label class="add-label">Название *</label>
+      <input class="add-inp" id="af_name" type="text" placeholder="Название товара">
+    </div>
+
+    <div class="add-field">
+      <label class="add-label">Бренд</label>
+      <div class="add-brand-wrap">
+        <input class="add-inp" id="af_brand" type="text" placeholder="Начните вводить бренд..."
+          oninput="onBrandInput(this.value)" onclick="onBrandInput(this.value)" autocomplete="off">
+        <div class="add-brand-res" id="af_brand_res"></div>
+      </div>
+    </div>
+
+    <div class="add-field">
+      <label class="add-label">Артикул</label>
+      <input class="add-inp" id="af_article" type="text" placeholder="Артикул">
+    </div>
+
+    <div class="add-field">
+      <label class="add-label">Тип товара</label>
+      <div class="add-type-row">
+        <button class="add-type-btn on" id="atype_tovar" onclick="setAddType('Товар')">Товар</button>
+        <button class="add-type-btn" id="atype_bundle" onclick="setAddType('Комплект')">Комплект</button>
+      </div>
+    </div>
+
+    <div class="add-field">
+      <label class="add-label">Фото (ссылки, по одной на строку)</label>
+      <textarea class="add-inp" id="af_photos" rows="3" placeholder="https://...&#10;https://..." style="resize:vertical"></textarea>
+      <div class="add-photos" id="af_photos_prev"></div>
+    </div>
+
+    <div class="add-field" id="af_comps_block" style="display:none">
+      <label class="add-label">Компоненты</label>
+      <div class="add-comps-list" id="af_comps_list"></div>
+      <div class="comp-add-row" style="margin-top:6px">
+        <div class="comp-search-wrap" id="csw__new">
+          <input class="dp-add-inp" id="csi__new" type="text" placeholder="Поиск по названию или SKU..."
+            oninput="onCompInput('_new',this.value)"
+            onkeydown="if(event.key==='Enter')afAddComp()">
+          <div class="comp-search-res" id="csr__new" style="display:none"></div>
+        </div>
+        <input class="comp-qty-inp" id="cqty__new" type="number" min="1" value="1" title="Количество">
+        <button class="dp-add-btn" onclick="afAddComp()">+ Добавить</button>
+      </div>
+    </div>
+
+    <div class="add-field">
+      <label class="add-label">Дублирующие карточки</label>
+      <div class="add-dups-list" id="af_dups_list"></div>
+      <div style="position:relative;margin-top:6px">
+        <input class="add-inp" id="af_dup_inp" type="text" placeholder="Поиск по названию или SKU..."
+          oninput="onAfDupInput(this.value)" autocomplete="off">
+        <div class="add-brand-res" id="af_dup_res"></div>
+      </div>
+    </div>
+
+    <button class="add-submit" onclick="submitNewProduct()">Создать карточку</button>
+  </div>
+  <div class="add-success" id="addSuccess">
+    ✓ Карточка создана!<br>
+    <button style="margin-top:14px;padding:8px 20px;border-radius:8px;border:1.5px solid var(--grn);background:none;color:var(--grn);cursor:pointer;font-weight:700" onclick="resetAddForm()">Добавить ещё</button>
+    <button style="margin-top:14px;margin-left:8px;padding:8px 20px;border-radius:8px;border:1.5px solid var(--blue);background:none;color:var(--blue);cursor:pointer;font-weight:700" onclick="switchTab('main')">Перейти в базу</button>
   </div>
 </div>
 
@@ -1071,6 +1192,7 @@ function buildCard(item,idx){
   if(flags.includes('has_dop_art')) fhtml.push(`<span class="flag f-dop">Доп.арт</span>`);
   if(flags.includes('barcode_dup')) fhtml.push(`<span class="flag f-bc">Штрихкод</span>`);
   if(flags.includes('needs_review')) fhtml.push(`<span class="flag f-nm">⚠ Проверить</span>`);
+  if(flags.includes('new_card'))    fhtml.push(`<span class="flag" style="background:#e7f5ff;color:#1971c2;font-weight:800">★ Новая</span>`);
   if(flags.includes('single_component')) fhtml.push(`<span class="flag f-sc">→ 1-комп</span>`);
 
   const price=cat.price?`<span class="price">${cat.price.toLocaleString('ru')} ₸</span>`:'';
@@ -1392,17 +1514,22 @@ let _ckLoaded = false;
 let _ckData   = null; // {missing_in_vps, extra_in_vps, fresh_dups}
 
 function switchTab(tab){
-  const isMain = tab === 'main';
+  const isMain  = tab==='main';
+  const isCheck = tab==='check';
+  const isAdd   = tab==='add';
   document.getElementById('tabMain').classList.toggle('active', isMain);
-  document.getElementById('tabCheck').classList.toggle('active', !isMain);
-  document.querySelector('main').style.display              = isMain ? '' : 'none';
-  document.getElementById('carouselSection').style.display  = isMain ? '' : 'none';
-  document.getElementById('catSection').style.display       = isMain ? '' : 'none';
-  document.getElementById('checkView').classList.toggle('show', !isMain);
-  if(!isMain){
+  document.getElementById('tabCheck').classList.toggle('active', isCheck);
+  document.getElementById('tabAdd').classList.toggle('active', isAdd);
+  document.querySelector('main').style.display              = isMain  ? '' : 'none';
+  document.getElementById('carouselSection').style.display  = isMain  ? '' : 'none';
+  document.getElementById('catSection').style.display       = isMain  ? '' : 'none';
+  document.getElementById('checkView').classList.toggle('show', isCheck);
+  document.getElementById('addView').classList.toggle('show', isAdd);
+  if(isCheck){
     if(!_ckLoaded) loadComparison();
     else recomputeComparison();
   }
+  if(isAdd && !currentUser){ alert('Войдите для добавления товаров'); switchTab('main'); }
 }
 
 // Build a card for Проверка — same look as main grid, extra dup markers
@@ -1630,6 +1757,155 @@ async function ckRemove(mainSku, dupSku, btn){
   } else { btn.disabled = false; btn.textContent = 'Убрать'; }
 }
 
+// ══ ДОБАВИТЬ ТОВАР ════════════════════════════════════════════════
+let _afType = 'Товар';
+let _afComps = [];  // [{name, qty}]
+let _afDups  = [];  // [{sku, name}]
+
+function setAddType(t){
+  _afType = t;
+  document.getElementById('atype_tovar').classList.toggle('on', t==='Товар');
+  document.getElementById('atype_bundle').classList.toggle('on', t==='Комплект');
+  document.getElementById('af_comps_block').style.display = t==='Комплект' ? '' : 'none';
+}
+
+// Brand autocomplete
+function onBrandInput(val){
+  const res = document.getElementById('af_brand_res');
+  if(!val || val.length < 1){ res.style.display='none'; return; }
+  const q = val.toLowerCase();
+  const brands = [...new Set(DATA.map(r=>r&&B(r)).filter(Boolean))].filter(b=>b.toLowerCase().includes(q)).slice(0,10);
+  const items = brands.map(b=>`<div class="add-brand-item" onclick="document.getElementById('af_brand').value='${b.replace(/'/g,"\\'")}';document.getElementById('af_brand_res').style.display='none'">${b}</div>`);
+  if(!brands.includes(val) && val.trim())
+    items.push(`<div class="add-brand-item add-brand-new" onclick="document.getElementById('af_brand_res').style.display='none'">+ Создать бренд «${val}»</div>`);
+  res.innerHTML = items.join('');
+  res.style.display = items.length ? 'block' : 'none';
+}
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.add-brand-wrap')) document.getElementById('af_brand_res').style.display='none';
+  if(!e.target.closest('#af_dup_inp') && !e.target.closest('#af_dup_res')) {
+    const r=document.getElementById('af_dup_res'); if(r) r.style.display='none';
+  }
+});
+
+// Photo preview
+document.addEventListener('DOMContentLoaded', ()=>{});
+function updatePhotoPrev(){
+  const urls = (document.getElementById('af_photos').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  document.getElementById('af_photos_prev').innerHTML = urls.map(u=>`<img class="add-ph-prev" src="${u}" alt="" onerror="this.style.opacity='.3'" loading="lazy">`).join('');
+}
+
+// Comp add for new form
+function afAddComp(){
+  const val = getCompVal('_new');
+  if(!val) return;
+  const {name, qty} = parseComp(val);
+  _afComps.push({name, qty, raw: val});
+  document.getElementById('csi__new').value='';
+  document.getElementById('csi__new').dataset.selName='';
+  document.getElementById('cqty__new').value='1';
+  document.getElementById('csr__new').style.display='none';
+  renderAfComps();
+}
+function renderAfComps(){
+  const nm = getNameMap();
+  document.getElementById('af_comps_list').innerHTML = _afComps.map((c,i)=>{
+    const rec = nm[c.name]||{};
+    const ph = (rec.catalog_info||{}).photos?.[0]||'';
+    const phEl = ph ? `<img class="comp-si-ph" src="${ph}" alt="" loading="lazy">` : `<div class="comp-si-ph" style="background:#f3f0ff;display:flex;align-items:center;justify-content:center;color:#9775fa;font-size:1rem"></div>`;
+    return `<div class="add-dup-row">${phEl}<span class="add-dup-name">${c.name}</span><span class="ci-qty">×${c.qty%1===0?c.qty:c.qty.toFixed(1)}</span><button class="add-dup-rm" onclick="_afComps.splice(${i},1);renderAfComps()">✕</button></div>`;
+  }).join('');
+}
+
+// Dup add for new form
+function onAfDupInput(val){
+  const res = document.getElementById('af_dup_res');
+  if(!val||val.length<2){res.style.display='none';return;}
+  const items = compSearchItems(val);
+  if(!items.length){res.innerHTML='<div class="rda-empty">Ничего не найдено</div>';res.style.display='block';return;}
+  res.style.display='block';
+  res.innerHTML=items.map(r=>{
+    const nm=r.name||(r.catalog_info||{}).title||r.main_sku;
+    const ph=(r.catalog_info||{}).photos?.[0]||'';
+    const phEl=ph?`<img class="comp-si-ph" src="${ph}" alt="" loading="lazy">`:`<div class="comp-si-ph" style="background:#f0f4f8;display:flex;align-items:center;justify-content:center;color:#aaa">—</div>`;
+    return `<div class="rda-item" onclick="afAddDup('${r.main_sku}','${nm.replace(/'/g,"\\'")}');document.getElementById('af_dup_res').style.display='none';document.getElementById('af_dup_inp').value=''">
+      ${phEl}<div class="comp-si-info"><div class="comp-si-name">${nm.slice(0,60)}</div><div class="comp-si-sku">${r.main_sku}</div></div></div>`;
+  }).join('');
+}
+function afAddDup(sku, name){
+  if(_afDups.find(d=>d.sku===sku)) return;
+  _afDups.push({sku, name});
+  renderAfDups();
+}
+function renderAfDups(){
+  document.getElementById('af_dups_list').innerHTML = _afDups.map((d,i)=>
+    `<div class="add-dup-row">
+      <span class="add-dup-name">${d.name.slice(0,50)}</span>
+      <span class="add-dup-sku">${d.sku}</span>
+      <button class="add-dup-rm" onclick="_afDups.splice(${i},1);renderAfDups()">✕</button>
+    </div>`
+  ).join('');
+}
+
+async function submitNewProduct(){
+  const sku   = document.getElementById('af_sku').value.trim();
+  const name  = document.getElementById('af_name').value.trim();
+  const price = parseFloat(document.getElementById('af_price').value)||0;
+  const brand = document.getElementById('af_brand').value.trim();
+  const article = document.getElementById('af_article').value.trim();
+  const photos = (document.getElementById('af_photos').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+
+  // Validate
+  let ok = true;
+  ['af_sku','af_name'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.classList.toggle('err', !el.value.trim());
+    if(!el.value.trim()) ok=false;
+  });
+  if(!ok) return;
+
+  const btn = document.querySelector('.add-submit');
+  btn.disabled=true; btn.textContent='Создаю...';
+
+  const record = {
+    main_sku: sku,
+    name: name,
+    ms_type: _afType,
+    article: article||null,
+    source: 'manual',
+    flags: ['new_card'],
+    dop_skus: _afDups.map(d=>d.sku),
+    components: _afComps.map(c=>c.raw),
+    comp_count: _afComps.length||null,
+    catalog_info: {
+      title: name,
+      price: price||null,
+      photos: photos,
+      status: null,
+    },
+  };
+  if(brand) record.brand = brand;
+
+  const res = await apiAction({action:'add_product', record});
+  btn.disabled=false; btn.textContent='Создать карточку';
+  if(res){
+    document.getElementById('addForm').style.display='none';
+    document.getElementById('addSuccess').style.display='block';
+    await refreshFromServer();
+  }
+}
+
+function resetAddForm(){
+  _afComps=[]; _afDups=[]; _afType='Товар';
+  ['af_sku','af_name','af_price','af_brand','af_article','af_photos'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('af_photos_prev').innerHTML='';
+  document.getElementById('af_dups_list').innerHTML='';
+  document.getElementById('af_comps_list').innerHTML='';
+  setAddType('Товар');
+  document.getElementById('addForm').style.display='';
+  document.getElementById('addSuccess').style.display='none';
+}
+
 // ══ INIT ══════════════════════════════════════════════════════════
 document.getElementById('si').addEventListener('input',e=>{
   clearTimeout(window._st);window._st=setTimeout(()=>{fSearch=e.target.value;apply();},220);
@@ -1640,6 +1916,9 @@ document.getElementById('sortSel').addEventListener('change',e=>{fSort=e.target.
 
 buildCarousel();
 apply();
+
+// Photo preview for add form
+document.getElementById('af_photos')?.addEventListener('input', updatePhotoPrev);
 
 // Refresh data from server in background (VPS API)
 async function refreshFromServer(){
