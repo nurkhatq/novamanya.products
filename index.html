@@ -1797,6 +1797,7 @@ async function ckRemove(mainSku, dupSku, btn){
 let _afType = 'Товар';
 let _afComps = [];  // [{name, qty}]
 let _afDups  = [];  // [{sku, name}]
+let _afPendingKaspi = {};  // sku → record (компоненты из Kaspi, ещё не созданные)
 
 async function fetchKaspiForComp(mainSku, sku){
   const res = document.getElementById('csr_'+mainSku);
@@ -1810,31 +1811,37 @@ async function fetchKaspiForComp(mainSku, sku){
       return;
     }
 
-    // Create card if not already in base
-    if(!DATA.find(item=>item&&item.main_sku===sku)){
-      const record = {
-        main_sku: sku,
-        name: d.title,
-        ms_type: 'Товар',
-        article: d.article||null,
-        source: 'auto_from_kaspi',
-        flags: ['new_card'],
-        dop_skus: [],
-        components: [],
-        comp_count: null,
-        brand: d.brand||null,
-        catalog_info: { title: d.title, photos: d.photos||[], price: null, status: null },
-      };
-      const ok = await apiAction({action:'add_product', record});
-      if(!ok){
-        if(res) res.innerHTML='<div class="rda-empty" style="color:var(--acc)">✗ Не удалось создать карточку</div>';
-        return;
-      }
-      await refreshFromServer();
+    const record = {
+      main_sku: sku,
+      name: d.title,
+      ms_type: 'Товар',
+      article: d.article||null,
+      source: 'auto_from_kaspi',
+      flags: ['new_card'],
+      dop_skus: [], components: [], comp_count: null,
+      brand: d.brand||null,
+      catalog_info: { title: d.title, photos: d.photos||[], price: null, status: null },
+    };
+
+    if(mainSku === '_new'){
+      // Форма "Добавить товар" — запоминаем, создадим вместе с комплектом
+      _afPendingKaspi[sku] = record;
+      // Временно добавляем в DATA чтобы renderAfComps мог показать фото
+      if(!DATA.find(item=>item&&item.main_sku===sku)) DATA.push(record);
       _nameMap = null;
+    } else {
+      // Редактирование существующей карточки — создаём сразу
+      if(!DATA.find(item=>item&&item.main_sku===sku)){
+        const ok = await apiAction({action:'add_product', record});
+        if(!ok){
+          if(res) res.innerHTML='<div class="rda-empty" style="color:var(--acc)">✗ Не удалось создать карточку</div>';
+          return;
+        }
+        await refreshFromServer();
+        _nameMap = null;
+      }
     }
 
-    // Select the comp
     selectComp(mainSku, sku, d.title);
     if(res) res.style.display='none';
 
@@ -1983,6 +1990,13 @@ async function submitNewProduct(){
   const btn = document.querySelector('.add-submit');
   btn.disabled=true; btn.textContent='Создаю...';
 
+  // Сначала создаём компоненты из Kaspi которые ещё не в базе
+  for(const [compSku, compRecord] of Object.entries(_afPendingKaspi)){
+    if(!DATA.find(item=>item&&item.main_sku===compSku&&item.source!=='auto_from_kaspi')){
+      await apiAction({action:'add_product', record: compRecord});
+    }
+  }
+
   const record = {
     main_sku: sku,
     name: name,
@@ -2012,7 +2026,7 @@ async function submitNewProduct(){
 }
 
 function resetAddForm(){
-  _afComps=[]; _afDups=[]; _afType='Товар';
+  _afComps=[]; _afDups=[]; _afType='Товар'; _afPendingKaspi={};
   ['af_sku','af_name','af_price','af_brand','af_article','af_photos','af_kaspi_sku'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('af_kaspi_status').textContent='';
   document.getElementById('af_photos_prev').innerHTML='';
