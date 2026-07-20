@@ -527,6 +527,14 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .nocat-result-badge{display:inline-block;font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:5px;margin-top:4px}
 .nocat-found{background:#d4edda;color:#155724}
 .nocat-notfound{background:#fff3cd;color:#856404}
+.promote-box{background:#fff8e1;border-top:1px solid #ffe082;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.promote-info{display:flex;align-items:center;gap:6px;flex:1;min-width:0;font-size:.75rem}
+.promote-label{color:var(--gry);font-weight:600;white-space:nowrap}
+.promote-name{color:var(--txt);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.promote-rev{background:#fff3cd;color:#856404;font-size:.68rem;font-weight:700;padding:2px 6px;border-radius:5px;white-space:nowrap}
+.promote-btn{padding:5px 12px;border:1.5px solid #f0a500;border-radius:7px;background:#fff;color:#856404;font-size:.75rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s}
+.promote-btn:hover{background:#f0a500;color:#fff}
+.promote-btn:disabled{opacity:.5;cursor:default}
 .add-dup-rm{background:none;border:none;color:var(--gry);cursor:pointer;font-size:.8rem}.add-dup-rm:hover{color:var(--acc)}
 .add-comps-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
 .add-submit{width:100%;padding:12px;border-radius:10px;background:#1d3557;color:#fff;border:none;cursor:pointer;font-size:.92rem;font-weight:700;margin-top:20px;transition:background .2s}
@@ -1617,7 +1625,7 @@ function switchTab(tab){
     else recomputeComparison();
   }
   if(isNew)   renderNewView();
-  if(isNocat) renderNocatView();
+  if(isNocat) renderNocatView(); // async, runs in background
   if(isAdd && !currentUser){ alert('Войдите для добавления товаров'); switchTab('main'); }
 }
 
@@ -1640,7 +1648,17 @@ function renderNewView(){
 // ── Нет в Kaspi ──────────────────────────────────────────────────
 function isNocat(r){ return !r.catalog_info?.status && r.source !== 'kaspi_only'; }
 
-function renderNocatView(){
+let _reviewsData = null;  // {main_sku → {best_dup, best_reviews, dups, ...}}
+
+async function loadReviewsData(){
+  try {
+    const r = await fetch('/api/reviews');
+    _reviewsData = r.ok ? await r.json() : {};
+  } catch(e){ _reviewsData = {}; }
+}
+
+async function renderNocatView(){
+  if(!_reviewsData) await loadReviewsData();
   const items = DATA.filter(r => r && isNocat(r));
   const badge = document.getElementById('nocatTabBadge');
   badge.textContent = items.length;
@@ -1653,8 +1671,43 @@ function renderNocatView(){
   g.innerHTML = '';
   if(!items.length){ g.innerHTML='<div style="color:var(--gry);padding:32px;text-align:center">Все товары есть на Kaspi</div>'; return; }
   const frag = document.createDocumentFragment();
-  items.forEach((item,i) => frag.appendChild(buildCard(item, 200000 + i)));
+  items.forEach((item, i) => {
+    const card = buildCard(item, 200000 + i);
+    // Inject promote recommendation if available
+    const rev = (_reviewsData || {})[item.main_sku];
+    if(rev?.best_dup){
+      const bestRec = DATA.find(r => r && r.main_sku === rev.best_dup);
+      const bestName = bestRec ? (bestRec.name || bestRec.catalog_info?.title || rev.best_dup) : rev.best_dup;
+      const box = document.createElement('div');
+      box.className = 'promote-box';
+      box.innerHTML = `
+        <div class="promote-info">
+          <span class="promote-label">Лучший дубль:</span>
+          <span class="promote-name">${bestName.slice(0,40)}</span>
+          <span class="promote-rev">${rev.best_reviews} отз.</span>
+        </div>
+        <button class="promote-btn" onclick="promoteAndDelete('${item.main_sku}','${rev.best_dup}',this)">
+          Применить
+        </button>`;
+      card.appendChild(box);
+    }
+    frag.appendChild(card);
+  });
   g.appendChild(frag);
+}
+
+async function promoteAndDelete(nocatSku, newMainSku, btn){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  if(!confirm(`Удалить карточку ${nocatSku} и сделать ${newMainSku} главной?`)) return;
+  btn.disabled = true; btn.textContent = '...';
+  const ok = await apiAction({action:'promote_dup', nocat_sku: nocatSku, new_main_sku: newMainSku});
+  if(ok){
+    await refreshFromServer();
+    _reviewsData = null;
+    renderNocatView();
+  } else {
+    btn.disabled = false; btn.textContent = 'Применить';
+  }
 }
 
 let _nocatChecking = false;
