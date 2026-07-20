@@ -1811,7 +1811,8 @@ async function renderNocatView(){
               const existName = (info.db_match.name || info.db_match.main_sku).slice(0,40).replace(/'/g,"\\'");
               actionBtn = '<span style="font-size:.72rem;color:#856404;background:#fff3cd;border-radius:5px;padding:2px 8px;border:1px solid #f0a500" title="' + existName + '">⚠ Уже есть: ' + existName + '</span>';
             } else {
-              actionBtn = '<button class="nocat-add-new-btn" onclick="addNocatAsNew(\'' + info.prefix + '\',\'' + item.main_sku + '\',\'' + escArt + '\',\'' + itemName + '\',' + JSON.stringify(info) + ',this)">Добавить как новый</button>';
+              _nocatKaspiData[info.prefix] = info;
+              actionBtn = '<button class="nocat-add-new-btn" onclick="addNocatAsNew(\'' + info.prefix + '\',\'' + item.main_sku + '\',\'' + escArt + '\',\'' + itemName + '\',this)">Добавить как новый</button>';
             }
           }
         }
@@ -1854,6 +1855,7 @@ async function promoteAndDelete(nocatSku, newMainSku, btn){
 }
 
 let _nocatResults = null;  // данные с VPS после запуска check_nocat_availability.py
+const _nocatKaspiData = {};  // prefix → kaspiData, для передачи в addNocatAsNew
 
 async function loadNocatResults(){
   try {
@@ -1882,12 +1884,12 @@ async function runNocatCheck(){
 
 // checkNocatCard removed — results are now rendered inline in renderNocatView
 
-async function addNocatAsNew(prefix, nocatSku, nocatArticle, nocatName, kaspiData, btn){
+async function addNocatAsNew(prefix, nocatSku, nocatArticle, nocatName, btn){
   if(!currentUser){ alert('Войдите для редактирования'); return; }
   if(!confirm('Добавить ' + prefix + ' как новый товар и удалить карточку ' + nocatSku + '?')) return;
   btn.disabled = true; btn.textContent = '...';
 
-  // Данные уже есть из предзагруженного результата
+  const kaspiData = _nocatKaspiData[prefix] || {};
   const record = {
     main_sku: prefix,
     article:  kaspiData.article || prefix,
