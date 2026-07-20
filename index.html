@@ -1576,11 +1576,36 @@ function renderComparison(){
     extraGrid.appendChild(buildCkCard(mainSku, new Set(), extraMap[mainSku], 'ckExtraGrid'));
   });
 
-  document.getElementById('ckInfo').textContent =
-    `${missMainSkus.length} карточек с недостающими дублями · ${extraMainSkus.length} карточек с лишними дублями`;
+  const total = missing.length + extra.length;
+  document.getElementById('ckInfo').textContent = total
+    ? `${missMainSkus.length} карточек с недостающими дублями · ${extraMainSkus.length} карточек с лишними дублями`
+    : '✓ Всё проверено — расхождений нет';
+  document.getElementById('ckInfo').style.color = total ? '' : 'var(--grn)';
 
   document.getElementById('ckLoad').style.display    = 'none';
   document.getElementById('ckContent').style.display = '';
+}
+
+function recomputeComparison(){
+  if(!_ckData) return;
+  const freshDups = _ckData.fresh_dups || {};
+  // Build current VPS dups map from live DATA
+  const vpsDups = {};
+  DATA.forEach(r => { if(r && r.dop_skus?.length) vpsDups[r.main_sku] = new Set(r.dop_skus); });
+  const missing = [], extra = [];
+  // missing: in ideal but not in VPS
+  Object.entries(freshDups).forEach(([main, dups]) => {
+    const vps = vpsDups[main] || new Set();
+    dups.forEach(dup => { if(!vps.has(dup)) missing.push([main, dup]); });
+  });
+  // extra: in VPS but not in ideal
+  Object.entries(vpsDups).forEach(([main, dups]) => {
+    const fresh = new Set(freshDups[main] || []);
+    dups.forEach(dup => { if(!fresh.has(dup)) extra.push([main, dup]); });
+  });
+  _ckData.missing_in_vps = missing;
+  _ckData.extra_in_vps   = extra;
+  renderComparison();
 }
 
 async function ckAdd(mainSku, dupSku, btn){
@@ -1588,10 +1613,8 @@ async function ckAdd(mainSku, dupSku, btn){
   btn.disabled = true; btn.textContent = '...';
   const ok = await apiAction({action:'add_dup', main_sku:mainSku, new_sku:dupSku});
   if(ok){
-    btn.textContent = '✓ Добавлено';
-    btn.style.cssText = 'background:#d8f3dc;color:#2d6a4f;border-color:#95d5a5';
-    const row = btn.closest('.di');
-    if(row){ row.classList.remove('di-missing'); }
+    await refreshFromServer();
+    recomputeComparison();
   } else { btn.disabled = false; btn.textContent = '+ Добавить'; }
 }
 
@@ -1600,10 +1623,8 @@ async function ckRemove(mainSku, dupSku, btn){
   btn.disabled = true; btn.textContent = '...';
   const ok = await apiAction({action:'remove_dup', main_sku:mainSku, dop_sku:dupSku, choice:'standalone'});
   if(ok){
-    btn.textContent = '✓ Убрано';
-    btn.style.cssText = 'background:var(--gry-bg);color:var(--gry);border-color:var(--brd)';
-    const row = btn.closest('.di');
-    if(row){ row.style.opacity = '.35'; }
+    await refreshFromServer();
+    recomputeComparison();
   } else { btn.disabled = false; btn.textContent = 'Убрать'; }
 }
 
