@@ -745,7 +745,7 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
       <div class="simple-view-title">Нет в Kaspi</div>
       <div class="simple-view-sub" id="nocatViewSub"></div>
     </div>
-    <button class="nocat-check-btn" id="nocatCheckBtn" onclick="runNocatCheck()">Проверить на Kaspi</button>
+    <button class="nocat-check-btn" id="nocatCheckBtn" onclick="runNocatCheck()">Обновить данные с VPS</button>
   </div>
   <div id="nocatCheckProgress" style="display:none;padding:8px 0 4px;font-size:.78rem;color:var(--blue)"></div>
   <div class="simple-grid" id="nocatGrid"></div>
@@ -1743,7 +1743,8 @@ async function loadReviewsData(){
 }
 
 async function renderNocatView(){
-  if(!_reviewsData) await loadReviewsData();
+  if(!_reviewsData)    await loadReviewsData();
+  if(!_nocatResults)   await loadNocatResults();
   const items = DATA.filter(r => r && isNocat(r));
   const badge = document.getElementById('nocatTabBadge');
   badge.textContent = items.length;
@@ -1809,107 +1810,88 @@ async function promoteAndDelete(nocatSku, newMainSku, btn){
   }
 }
 
-let _nocatChecking = false;
+let _nocatResults = null;  // данные с VPS после запуска check_nocat_availability.py
+
+async function loadNocatResults(){
+  try {
+    const r = await fetch('/api/nocat-results');
+    _nocatResults = r.ok ? await r.json() : {};
+  } catch(e){ _nocatResults = {}; }
+}
+
 async function runNocatCheck(){
-  if(_nocatChecking) return;
-  const items = DATA.filter(r => r && isNocat(r));
-  if(!items.length) return;
-  _nocatChecking = true;
-  const btn = document.getElementById('nocatCheckBtn');
+  // Запросы к Kaspi делаются локально скриптом check_nocat_availability.py
+  // Эта кнопка только перезагружает результаты с VPS
+  const btn  = document.getElementById('nocatCheckBtn');
   const prog = document.getElementById('nocatCheckProgress');
   btn.disabled = true;
   prog.style.display = 'block';
-  // Remove old result badges
-  document.querySelectorAll('.nocat-result-badge').forEach(el=>el.remove());
-  let done = 0;
-  prog.textContent = `Проверяем: 0 / ${items.length}`;
-  for(const item of items){
-    try {
-      const r = await fetch(
-        `https://kaspi.kz/yml/content/item/product/${item.main_sku}`,
-        {headers:{'accept':'application/json, */*','user-agent':'Mozilla/5.0','referer':'https://kaspi.kz/'}}
-      );
-      const found = r.ok && (await r.json())?.card?.name;
-      // Find the card element and inject result badge
-      const cardEl = document.querySelector(`[data-sku="${item.main_sku}"]`);
-      if(cardEl){
-        const badge = document.createElement('span');
-        badge.className = 'nocat-result-badge ' + (found ? 'nocat-found' : 'nocat-notfound');
-        badge.textContent = found ? '✓ Найден на Kaspi' : '✗ Нет на Kaspi';
-        cardEl.querySelector('.cb')?.appendChild(badge);
-      }
-    } catch(e){}
-    done++;
-    prog.textContent = `Проверяем: ${done} / ${items.length}`;
-  }
-  prog.textContent = `Готово: проверено ${done} товаров`;
+  prog.textContent = 'Загружаю результаты проверки с VPS...';
+  _nocatResults = null;
+  await loadNocatResults();
+  const cnt = Object.keys(_nocatResults || {}).length;
+  prog.textContent = cnt
+    ? `Загружено: ${cnt} карточек. Запустите check_nocat_availability.py для обновления.`
+    : 'Нет данных. Запустите: python check_nocat_availability.py';
   btn.disabled = false;
-  _nocatChecking = false;
+  renderNocatView();
 }
 
-// ── Nocat per-card check ──────────────────────────────────────────────────────────
-async function checkNocatCard(mainSku, dupSkus, boxEl){
+// ── Nocat per-card check (данные из check_nocat_availability.py → VPS) ───────────
+function checkNocatCard(mainSku, dupSkus, boxEl){
   const resultEl = document.getElementById('ncr_' + mainSku);
   const btn = boxEl.querySelector('.nocat-check-item-btn');
-  btn.disabled = true; btn.textContent = 'Проверяем...';
-  resultEl.innerHTML = '';
 
-  const pfx = s => s.split('_')[0];
-  const allSkus = [mainSku, ...(dupSkus || [])];
-  const uniquePrefixes = [...new Set(allSkus.map(pfx))];
-
-  let activeSet = new Set();
-  try {
-    const r = await fetch('https://kaspi.kz/yml/offer-view/offers', {
-      method: 'POST',
-      headers: {'Accept':'application/json, text/*','Content-Type':'application/json; charset=UTF-8',
-                'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; Nexus 5) AppleWebKit/537.36 Chrome/148.0.0.0 Mobile Safari/537.36',
-                'X-KS-City':'750000000','Referer':'https://kaspi.kz/shop/'},
-      body: JSON.stringify({cityId:'750000000', entries: uniquePrefixes.map(p=>({sku:p})), options:['PRICE'], zoneId:['Magnum_ZONE1']})
-    });
-    const data = r.ok ? await r.json() : [];
-    activeSet = new Set((data||[]).map(x => x.masterSku || x.groupedSku || x.sku).filter(Boolean));
-  } catch(e){}
-
-  const mainItem = DATA.find(r => r && r.main_sku === mainSku);
-  const mainArticle = (mainItem?.article || pfx(mainSku)).replace(/'/g,"\\'");
-  const mainName    = (mainItem?.catalog_info?.name || mainSku).replace(/'/g,"\\'").slice(0,60);
-
-  let html = '';
-  const seen = new Set();
-  for(const sku of allSkus){
-    const p = pfx(sku);
-    if(seen.has(p)) continue;
-    seen.add(p);
-    const onSale = activeSet.has(p);
-    const isDup  = sku !== mainSku;
-    const label  = isDup ? ('Дубль ' + sku) : 'Основная карточка';
-    html += '<div class="nocat-prefix-row">' +
-      '<span class="nocat-prefix-label">' + label + '</span>' +
-      '<span style="font-family:monospace;font-size:.72rem;color:var(--txt2)">' + p + '</span>' +
-      '<span style="color:' + (onSale?'var(--grn)':'var(--red)') + ';font-weight:700;font-size:.75rem">' + (onSale?'✓ в продаже':'✗ нет') + '</span>' +
-      (onSale ? '<button class="nocat-add-new-btn" onclick="addNocatAsNew(\'' + p + '\',\'' + mainSku + '\',\'' + mainArticle + '\',\'' + mainName + '\',this)">Добавить как новый</button>' : '') +
-      '</div>';
+  if(!_nocatResults){
+    resultEl.innerHTML = '<div style="color:var(--txt2);font-size:.78rem;padding-top:6px">' +
+      'Нет данных. Запустите: <code>python check_nocat_availability.py</code> затем нажмите "Обновить данные"</div>';
+    return;
   }
-  resultEl.innerHTML = html || '<div style="color:var(--txt2);font-size:.78rem;padding-top:6px">Ошибка проверки</div>';
-  btn.disabled = false; btn.textContent = 'Проверить в Kaspi';
+
+  const data = _nocatResults[mainSku];
+  if(!data){
+    resultEl.innerHTML = '<div style="color:var(--txt2);font-size:.78rem;padding-top:6px">Карточка не найдена в результатах. Перезапустите скрипт.</div>';
+    return;
+  }
+
+  const mainItem  = DATA.find(r => r && r.main_sku === mainSku);
+  const mainName  = (mainItem?.catalog_info?.name || mainSku).replace(/'/g,"\\'").slice(0,60);
+
+  const renderRow = (info, isMain) => {
+    const onSale = info.on_sale === true;
+    const label  = isMain ? 'Основная карточка' : ('Дубль ' + info.sku);
+    const escArt = (info.article || info.prefix).replace(/'/g,"\\'");
+    const escTitle = (info.title||'').replace(/'/g,"\\'").slice(0,60);
+    return '<div class="nocat-prefix-row">' +
+      '<span class="nocat-prefix-label">' + label + '</span>' +
+      '<span style="font-family:monospace;font-size:.72rem;color:var(--txt2)">' + info.prefix + '</span>' +
+      '<span style="color:' + (onSale?'var(--grn)':'var(--red)') + ';font-weight:700;font-size:.75rem">' + (onSale?'✓ в продаже':'✗ нет') + '</span>' +
+      (onSale
+        ? '<button class="nocat-add-new-btn" onclick="addNocatAsNew(\'' + info.prefix + '\',\'' + mainSku + '\',\'' + escArt + '\',\'' + mainName + '\',' + JSON.stringify(info) + ',this)">Добавить как новый</button>'
+        : '') +
+      (onSale && info.title ? '<span style="font-size:.72rem;color:var(--txt2);margin-left:4px">' + info.title.slice(0,35) + '</span>' : '') +
+      '</div>';
+  };
+
+  let html = renderRow(data.main, true);
+  for(const dup of (data.dups || [])) html += renderRow(dup, false);
+
+  resultEl.innerHTML = html;
+  btn.textContent = 'Проверить в Kaspi';
 }
 
-async function addNocatAsNew(prefix, nocatSku, nocatArticle, nocatName, btn){
+async function addNocatAsNew(prefix, nocatSku, nocatArticle, nocatName, kaspiData, btn){
   if(!currentUser){ alert('Войдите для редактирования'); return; }
   if(!confirm('Добавить ' + prefix + ' как новый товар и удалить карточку ' + nocatSku + '?')) return;
   btn.disabled = true; btn.textContent = '...';
 
-  const kr = await fetch('/api/kaspi-sku/' + prefix);
-  const kdata = kr.ok ? await kr.json() : null;
-  if(!kdata || kdata.error){ btn.textContent = 'Ошибка Kaspi'; btn.disabled = false; return; }
-
+  // Данные уже есть из предзагруженного результата
   const record = {
-    main_sku: kdata.sku || prefix,
-    article:  prefix,
-    name:     kdata.title || '',
-    brand:    kdata.brand || '',
-    catalog_info: {name: kdata.title || '', photos: kdata.photos || [], status: 'active'},
+    main_sku: prefix,
+    article:  kaspiData.article || prefix,
+    name:     kaspiData.title || '',
+    brand:    kaspiData.brand || '',
+    catalog_info: {name: kaspiData.title || '', photos: kaspiData.photos || [], status: 'active'},
     flags:    ['new_card'],
     source:   'kaspi_autofill',
     dop_skus: [],
@@ -1923,6 +1905,7 @@ async function addNocatAsNew(prefix, nocatSku, nocatArticle, nocatName, btn){
     btn.textContent = '✓ Готово';
     await refreshFromServer();
     _reviewsData = null;
+    _nocatResults = null;
     renderNocatView();
   } else {
     btn.textContent = 'Ошибка удаления';
