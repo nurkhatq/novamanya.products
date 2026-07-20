@@ -1757,6 +1757,7 @@ async function renderNocatView(){
   const g = document.getElementById('nocatGrid');
   g.innerHTML = '';
   if(!items.length){ g.innerHTML='<div style="color:var(--gry);padding:32px;text-align:center">Все товары есть на Kaspi</div>'; return; }
+
   const frag = document.createDocumentFragment();
   items.forEach((item, i) => {
     const card = buildCard(item, 200000 + i);
@@ -1793,18 +1794,33 @@ async function renderNocatView(){
     } else if(!data){
       resultHtml = '<div style="color:var(--txt2);font-size:.76rem;padding:4px 0">Нет в результатах. Перезапустите скрипт.</div>';
     } else {
+      const dupPrefixes = new Set((item.dop_skus || []).map(s => s.split('_')[0]));
       const renderRow = (info, isMain) => {
         const onSale   = info.on_sale === true;
         const label    = isMain ? 'Основная' : 'Дубль';
         const escArt   = (info.article || info.prefix).replace(/'/g,"\\'");
         const escTitle = (info.title||'').replace(/'/g,"\\'").slice(0,50);
         const escInfo  = JSON.stringify(info).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        let actionBtn  = '';
+        if(onSale){
+          const dupSkuWithSamePrefix = (item.dop_skus || []).find(s => s.split('_')[0] === info.prefix);
+          if(dupSkuWithSamePrefix){
+            actionBtn = '<button class="promote-btn" onclick="promoteAndDelete(\'' + item.main_sku + '\',\'' + dupSkuWithSamePrefix + '\',this)">Применить дубль</button>';
+          } else {
+            if(info.db_match){
+              const existName = (info.db_match.name || info.db_match.main_sku).slice(0,40).replace(/'/g,"\\'");
+              actionBtn = '<span style="font-size:.72rem;color:#856404;background:#fff3cd;border-radius:5px;padding:2px 8px;border:1px solid #f0a500" title="' + existName + '">⚠ Уже есть: ' + existName + '</span>';
+            } else {
+              actionBtn = '<button class="nocat-add-new-btn" onclick="addNocatAsNew(\'' + info.prefix + '\',\'' + item.main_sku + '\',\'' + escArt + '\',\'' + itemName + '\',' + JSON.stringify(info) + ',this)">Добавить как новый</button>';
+            }
+          }
+        }
         return '<div class="nocat-prefix-row">' +
           '<span class="nocat-prefix-label" style="min-width:60px">' + label + '</span>' +
           '<span style="font-family:monospace;font-size:.72rem;color:var(--txt2)">' + info.prefix + '</span>' +
           '<span style="color:' + (onSale?'var(--grn)':'var(--red)') + ';font-weight:700;font-size:.75rem">' + (onSale?'✓ в продаже':'✗ нет') + '</span>' +
           (info.title ? '<span style="font-size:.72rem;color:var(--txt2)">' + info.title.slice(0,35) + '</span>' : '') +
-          (onSale ? '<button class="nocat-add-new-btn" onclick="addNocatAsNew(\'' + info.prefix + '\',\'' + item.main_sku + '\',\'' + escArt + '\',\'' + itemName + '\',' + JSON.stringify(info) + ',this)">Добавить как новый</button>' : '') +
+          actionBtn +
           '</div>';
       };
       resultHtml = renderRow(data.main, true);
