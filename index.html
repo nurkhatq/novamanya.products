@@ -521,6 +521,13 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .simple-view-title{font-size:1rem;font-weight:800;color:var(--txt)}
 .simple-view-sub{font-size:.76rem;color:var(--gry);margin-top:3px}
 .simple-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.nocat-action-box{margin-top:10px;padding:10px 12px;background:var(--gry-bg);border-radius:8px;border:1px solid var(--brd)}
+.nocat-action-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.nocat-prefix-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--brd);margin-top:6px;font-size:.77rem}
+.nocat-prefix-label{color:var(--txt2);min-width:90px}
+.nocat-check-item-btn{padding:4px 12px;border-radius:6px;border:1.5px solid var(--blue);background:none;color:var(--blue);cursor:pointer;font-size:.75rem;font-weight:700}
+.nocat-add-new-btn{padding:4px 12px;border-radius:6px;border:none;background:var(--grn);color:#fff;cursor:pointer;font-size:.75rem;font-weight:700}
+.nocat-del-btn{padding:4px 12px;border-radius:6px;border:1.5px solid var(--red);background:none;color:var(--red);cursor:pointer;font-size:.75rem;font-weight:700;margin-left:auto}
 .nocat-check-btn{padding:8px 18px;border:1.5px solid var(--blue);border-radius:9px;background:var(--blue-bg);color:var(--blue);font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
 .nocat-check-btn:hover{background:var(--blue);color:#fff}
 .nocat-check-btn:disabled{opacity:.5;cursor:default}
@@ -739,7 +746,6 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
       <div class="simple-view-sub" id="nocatViewSub"></div>
     </div>
     <button class="nocat-check-btn" id="nocatCheckBtn" onclick="runNocatCheck()">Проверить на Kaspi</button>
-    <button class="nocat-check-btn" id="nocatCleanBtn" onclick="runNocatCleanup()" style="background:var(--red);margin-left:8px">Очистить ненужные</button>
   </div>
   <div id="nocatCheckProgress" style="display:none;padding:8px 0 4px;font-size:.78rem;color:var(--blue)"></div>
   <div class="simple-grid" id="nocatGrid"></div>
@@ -1660,7 +1666,15 @@ async function renderRenamesView(){
   badge.textContent = items.length;
   badge.style.display = items.length ? 'inline-block' : 'none';
   sub.textContent = items.length + ' записей с исправленными SKU';
-  if(!items.length){ grid.innerHTML = '<div style="padding:12px;color:var(--txt2)">Нет данных</div>'; return; }
+
+  // Also load deleted nocat for display
+  let deletedNocat = [];
+  try {
+    const dr = await fetch('/api/deleted-nocat');
+    if(dr.ok) deletedNocat = await dr.json();
+  } catch(e){}
+
+  if(!items.length && !deletedNocat.length){ grid.innerHTML = '<div style="padding:12px;color:var(--txt2)">Нет данных</div>'; return; }
   const rows = items.map(x =>
     '<tr style="border-bottom:1px solid var(--brd)">' +
     '<td style="padding:7px 12px">' + (x.name||'') + '</td>' +
@@ -1669,14 +1683,35 @@ async function renderRenamesView(){
     '<td style="padding:7px 12px;font-family:monospace;color:var(--blue)">' + x.new_article + '</td>' +
     '</tr>'
   ).join('');
+
+  const delRows = deletedNocat.map(x =>
+    '<tr style="border-bottom:1px solid var(--brd)">' +
+    '<td style="padding:7px 12px">' + (x.name||'—') + '</td>' +
+    '<td style="padding:7px 12px;font-family:monospace;color:var(--red)">' + x.sku + '</td>' +
+    '<td style="padding:7px 12px;font-family:monospace;color:var(--blue)">' + (x.article||'') + '</td>' +
+    '<td style="padding:7px 12px;font-size:.7rem;color:var(--txt2)">' + (x.deleted_at||'').slice(0,10) + '</td>' +
+    '</tr>'
+  ).join('');
+
   grid.innerHTML =
-    '<table style="width:100%;border-collapse:collapse;font-size:.8rem">' +
+    (items.length ? (
+    '<div style="font-weight:700;font-size:.8rem;color:var(--txt2);margin-bottom:6px">Исправленные SKU (' + items.length + ')</div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:20px">' +
     '<thead><tr style="background:var(--card-bg);color:var(--txt2);font-size:.72rem">' +
     '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--brd)">Название</th>' +
     '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--brd)">Старый SKU</th>' +
     '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--brd)">Новый SKU</th>' +
     '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--brd)">Новый артикул</th>' +
-    '</tr></thead><tbody>' + rows + '</tbody></table>';
+    '</tr></thead><tbody>' + rows + '</tbody></table>') : '') +
+    (deletedNocat.length ? (
+    '<div style="font-weight:700;font-size:.8rem;color:var(--txt2);margin-bottom:6px">Удалённые nocat (нужно удалить в МС) (' + deletedNocat.length + ')</div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:.8rem">' +
+    '<thead><tr style="background:var(--card-bg);color:var(--txt2);font-size:.72rem">' +
+    '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--brd)">Название</th>' +
+    '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--brd)">SKU (код)</th>' +
+    '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--brd)">Артикул</th>' +
+    '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid var(--brd)">Дата</th>' +
+    '</tr></thead><tbody>' + delRows + '</tbody></table>') : '');
 }
 
 // ── Новые карточки ────────────────────────────────────────────────
@@ -1741,6 +1776,20 @@ async function renderNocatView(){
         </button>`;
       card.appendChild(box);
     }
+    // Per-card action box: check availability + delete with tracking
+    const dupSkusJson = JSON.stringify(item.dop_skus || []).replace(/'/g, "\\'");
+    const itemArticle = (item.article || item.main_sku.split('_')[0]).replace(/'/g, "\\'");
+    const itemName    = (item.catalog_info?.name || item.main_sku).replace(/'/g, "\\'").slice(0, 60);
+    const actionBox = document.createElement('div');
+    actionBox.className = 'nocat-action-box';
+    actionBox.id = 'nab_' + item.main_sku;
+    actionBox.innerHTML =
+      '<div class="nocat-action-row">' +
+      '<button class="nocat-check-item-btn" onclick="checkNocatCard(\'' + item.main_sku + '\',' + dupSkusJson + ',document.getElementById(\'nab_' + item.main_sku + '\'))">Проверить в Kaspi</button>' +
+      '<button class="nocat-del-btn" onclick="deleteNocatTracked(\'' + item.main_sku + '\',\'' + itemArticle + '\',\'' + itemName + '\',this)">Удалить карточку</button>' +
+      '</div>' +
+      '<div class="nocat-check-result" id="ncr_' + item.main_sku + '"></div>';
+    card.appendChild(actionBox);
     frag.appendChild(card);
   });
   g.appendChild(frag);
@@ -1798,93 +1847,101 @@ async function runNocatCheck(){
   _nocatChecking = false;
 }
 
-// ── Nocat Cleanup ──────────────────────────────────────────────────────────────────
-let _nocatCleanRunning = false;
-async function runNocatCleanup(){
-  if(_nocatCleanRunning) return;
-  const nocatItems = DATA.filter(r => r && isNocat(r));
-  if(!nocatItems.length){ alert('Нет товаров "нет в Kaspi"'); return; }
-  _nocatCleanRunning = true;
-  const btn = document.getElementById('nocatCleanBtn');
+// ── Nocat per-card check ──────────────────────────────────────────────────────────
+async function checkNocatCard(mainSku, dupSkus, boxEl){
+  const resultEl = document.getElementById('ncr_' + mainSku);
+  const btn = boxEl.querySelector('.nocat-check-item-btn');
   btn.disabled = true; btn.textContent = 'Проверяем...';
+  resultEl.innerHTML = '';
 
-  // Check availability via Kaspi offers API in batches of 50
-  const BATCH = 50;
-  const allSkus = nocatItems.map(r => r.main_sku);
-  const avail = {};
+  const pfx = s => s.split('_')[0];
+  const allSkus = [mainSku, ...(dupSkus || [])];
+  const uniquePrefixes = [...new Set(allSkus.map(pfx))];
 
-  for(let i=0; i<allSkus.length; i+=BATCH){
-    const batch = allSkus.slice(i, i+BATCH);
-    btn.textContent = `Проверяем ${i}/${allSkus.length}...`;
-    try {
-      const r = await fetch('https://kaspi.kz/yml/offer-view/offers', {
-        method: 'POST',
-        headers: {'Accept':'application/json, text/*','Content-Type':'application/json; charset=UTF-8',
-                  'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; Nexus 5) AppleWebKit/537.36 Chrome/148.0.0.0 Mobile Safari/537.36',
-                  'X-KS-City':'750000000','Referer':'https://kaspi.kz/shop/'},
-        body: JSON.stringify({cityId:'750000000', entries: batch.map(s=>({sku:s})), options:['PRICE'], zoneId:['Magnum_ZONE1']})
-      });
-      const data = r.ok ? await r.json() : [];
-      const active = new Set((data||[]).map(x=>x.sku).filter(Boolean));
-      batch.forEach(s => avail[s] = active.has(s));
-    } catch(e){ batch.forEach(s => avail[s] = null); }
+  let activeSet = new Set();
+  try {
+    const r = await fetch('https://kaspi.kz/yml/offer-view/offers', {
+      method: 'POST',
+      headers: {'Accept':'application/json, text/*','Content-Type':'application/json; charset=UTF-8',
+                'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; Nexus 5) AppleWebKit/537.36 Chrome/148.0.0.0 Mobile Safari/537.36',
+                'X-KS-City':'750000000','Referer':'https://kaspi.kz/shop/'},
+      body: JSON.stringify({cityId:'750000000', entries: uniquePrefixes.map(p=>({sku:p})), options:['PRICE'], zoneId:['Magnum_ZONE1']})
+    });
+    const data = r.ok ? await r.json() : [];
+    activeSet = new Set((data||[]).map(x => x.masterSku || x.groupedSku || x.sku).filter(Boolean));
+  } catch(e){}
+
+  const mainItem = DATA.find(r => r && r.main_sku === mainSku);
+  const mainArticle = (mainItem?.article || pfx(mainSku)).replace(/'/g,"\\'");
+  const mainName    = (mainItem?.catalog_info?.name || mainSku).replace(/'/g,"\\'").slice(0,60);
+
+  let html = '';
+  const seen = new Set();
+  for(const sku of allSkus){
+    const p = pfx(sku);
+    if(seen.has(p)) continue;
+    seen.add(p);
+    const onSale = activeSet.has(p);
+    const isDup  = sku !== mainSku;
+    const label  = isDup ? ('Дубль ' + sku) : 'Основная карточка';
+    html += '<div class="nocat-prefix-row">' +
+      '<span class="nocat-prefix-label">' + label + '</span>' +
+      '<span style="font-family:monospace;font-size:.72rem;color:var(--txt2)">' + p + '</span>' +
+      '<span style="color:' + (onSale?'var(--grn)':'var(--red)') + ';font-weight:700;font-size:.75rem">' + (onSale?'✓ в продаже':'✗ нет') + '</span>' +
+      (onSale ? '<button class="nocat-add-new-btn" onclick="addNocatAsNew(\'' + p + '\',\'' + mainSku + '\',\'' + mainArticle + '\',\'' + mainName + '\',this)">Добавить как новый</button>' : '') +
+      '</div>';
   }
-
-  // Show results modal
-  const onSale    = nocatItems.filter(r => avail[r.main_sku] === true);
-  const notOnSale = nocatItems.filter(r => avail[r.main_sku] === false);
-  const errors    = nocatItems.filter(r => avail[r.main_sku] == null);
-
-  const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
-  const box = document.createElement('div');
-  box.style.cssText = 'background:var(--card-bg);border-radius:14px;padding:24px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.4)';
-
-  const mkRow = (r, color, action) =>
-    `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--brd)">` +
-    `<span style="flex:1;font-size:.8rem">${r.catalog_info?.name||r.main_sku}</span>` +
-    `<span style="font-family:monospace;font-size:.72rem;color:var(--txt2)">${r.main_sku}</span>` +
-    `<span style="color:${color};font-size:.75rem;font-weight:700">${action}</span>` +
-    `<button onclick="deleteNocatCard('${r.main_sku}',this)" style="padding:3px 10px;border-radius:6px;border:1.5px solid var(--red);background:none;color:var(--red);cursor:pointer;font-size:.72rem;font-weight:700">Удалить</button>` +
-    `</div>`;
-
-  box.innerHTML =
-    `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">` +
-    `<h3 style="margin:0;font-size:1rem">Результат проверки (${nocatItems.length} товаров)</h3>` +
-    `<button onclick="this.closest('[style*=fixed]').remove()" style="border:none;background:none;font-size:1.4rem;cursor:pointer;color:var(--txt2)">✕</button></div>` +
-    (onSale.length ? `<div style="font-weight:700;font-size:.78rem;color:var(--grn);margin:10px 0 4px">✓ Есть на Kaspi (${onSale.length}) — можно добавить как новый товар или удалить</div>` + onSale.map(r=>mkRow(r,'var(--grn)','в продаже')).join('') : '') +
-    (notOnSale.length ? `<div style="font-weight:700;font-size:.78rem;color:var(--red);margin:10px 0 4px">✗ Нет на Kaspi (${notOnSale.length}) — рекомендуем удалить</div>` + notOnSale.map(r=>mkRow(r,'var(--red)','не в продаже')).join('') : '') +
-    (errors.length ? `<div style="font-weight:700;font-size:.78rem;color:var(--txt2);margin:10px 0 4px">? Ошибка проверки (${errors.length})</div>` + errors.map(r=>`<div style="font-size:.78rem;padding:4px 0;color:var(--txt2)">${r.main_sku}</div>`).join('') : '') +
-    `<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">` +
-    (notOnSale.length ? `<button onclick="deleteAllNotOnSale([${notOnSale.map(r=>"'"+r.main_sku+"'").join(',')}],this)" style="padding:7px 16px;border-radius:8px;border:none;background:var(--red);color:#fff;cursor:pointer;font-weight:700;font-size:.8rem">Удалить все не в продаже (${notOnSale.length})</button>` : '') +
-    `</div>`;
-
-  modal.appendChild(box);
-  document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
-
-  btn.disabled = false; btn.textContent = 'Очистить ненужные';
-  _nocatCleanRunning = false;
+  resultEl.innerHTML = html || '<div style="color:var(--txt2);font-size:.78rem;padding-top:6px">Ошибка проверки</div>';
+  btn.disabled = false; btn.textContent = 'Проверить в Kaspi';
 }
 
-async function deleteNocatCard(sku, btn){
-  if(!confirm(`Удалить карточку ${sku}?`)) return;
+async function addNocatAsNew(prefix, nocatSku, nocatArticle, nocatName, btn){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  if(!confirm('Добавить ' + prefix + ' как новый товар и удалить карточку ' + nocatSku + '?')) return;
   btn.disabled = true; btn.textContent = '...';
-  const r = await apiAction({action:'delete_product', sku});
-  if(r.ok){ btn.closest('div').style.opacity='0.4'; btn.textContent='Удалено'; }
-  else { btn.disabled=false; btn.textContent='Ошибка'; }
+
+  const kr = await fetch('/api/kaspi-sku/' + prefix);
+  const kdata = kr.ok ? await kr.json() : null;
+  if(!kdata || kdata.error){ btn.textContent = 'Ошибка Kaspi'; btn.disabled = false; return; }
+
+  const record = {
+    main_sku: kdata.sku || prefix,
+    article:  prefix,
+    name:     kdata.title || '',
+    brand:    kdata.brand || '',
+    catalog_info: {name: kdata.title || '', photos: kdata.photos || [], status: 'active'},
+    flags:    ['new_card'],
+    source:   'kaspi_autofill',
+    dop_skus: [],
+    components: [], comp_count: 0,
+  };
+  const addOk = await apiAction({action:'add_product', record});
+  if(!addOk){ btn.textContent = 'Ошибка создания'; btn.disabled = false; return; }
+
+  const delOk = await apiAction({action:'delete_nocat', sku: nocatSku, article: nocatArticle, name: nocatName});
+  if(delOk){
+    btn.textContent = '✓ Готово';
+    await refreshFromServer();
+    _reviewsData = null;
+    renderNocatView();
+  } else {
+    btn.textContent = 'Ошибка удаления';
+  }
 }
 
-async function deleteAllNotOnSale(skus, btn){
-  if(!confirm(`Удалить ${skus.length} товаров не в продаже?`)) return;
-  btn.disabled = true;
-  let ok = 0;
-  for(const sku of skus){
-    const r = await apiAction({action:'delete_product', sku});
-    if(r.ok) ok++;
+async function deleteNocatTracked(sku, article, name, btn){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  if(!confirm('Удалить карточку ' + sku + ' и добавить в список для удаления в МС?')) return;
+  btn.disabled = true; btn.textContent = '...';
+  const ok = await apiAction({action:'delete_nocat', sku, article, name});
+  if(ok){
+    btn.textContent = '✓ Удалено';
+    await refreshFromServer();
+    _reviewsData = null;
+    renderNocatView();
+  } else {
+    btn.disabled = false; btn.textContent = 'Удалить карточку';
   }
-  btn.textContent = `Удалено ${ok}/${skus.length}`;
-  setTimeout(()=>{ location.reload(); },1500);
 }
 
 // Build a card for Проверка — same look as main grid, extra dup markers
