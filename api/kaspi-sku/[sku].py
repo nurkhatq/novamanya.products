@@ -77,6 +77,7 @@ def fetch_kaspi(sku):
                     break
 
     price = ""
+    debug = {}
 
     # Step 2: HTML page — price from <meta> tag + more photos
     if shop_link:
@@ -86,18 +87,21 @@ def fetch_kaspi(sku):
                 headers=html_headers,
             )
             with urllib.request.urlopen(req2, timeout=20) as r:
+                html_status = r.status
                 html = r.read().decode("utf-8", errors="replace")
+            debug["html_status"] = html_status
+            debug["html_len"] = len(html)
 
-            # Price from meta tag — simplest and most reliable
             m = re.search(r'<meta[^>]+property="product:price:amount"[^>]+content="(\d+)"', html)
             if not m:
                 m = re.search(r'<meta[^>]+content="(\d+)"[^>]+property="product:price:amount"', html)
             if m:
                 price = int(m.group(1))
+                debug["price_src"] = "meta_tag"
 
-            # Photos from BACKEND JSON (may have more)
             marker = "BACKEND.components.item = "
             pos = html.find(marker)
+            debug["backend_marker"] = pos != -1
             if pos != -1:
                 try:
                     js = html.index("{", pos + len(marker))
@@ -110,10 +114,10 @@ def fetch_kaspi(sku):
                     ]
                     if html_photos:
                         photos = html_photos
-                    # Price fallback from BACKEND if meta not found
                     if not price:
                         price = (data.get("card") or {}).get("price") or ""
-                    # Article from HTML specs (more complete)
+                        if price:
+                            debug["price_src"] = "backend_json"
                     if article == sku:
                         for group in (data.get("specifications") or []):
                             for feat in (group.get("features") or []):
@@ -124,10 +128,10 @@ def fetch_kaspi(sku):
                                     if val:
                                         article = val
                                         break
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    debug["backend_parse_err"] = str(e)
+        except Exception as e:
+            debug["html_err"] = str(e)
 
     # Step 3: offers API for price if still missing
     if not price:
@@ -137,13 +141,17 @@ def fetch_kaspi(sku):
                 headers=json_headers,
             )
             with urllib.request.urlopen(req3, timeout=10) as r:
+                offers_status = r.status
                 od = json.loads(r.read().decode("utf-8"))
+            debug["offers_status"] = offers_status
             offers = od.get("offers") or []
+            debug["offers_count"] = len(offers)
             prices = [o["price"] for o in offers if o.get("price")]
             if prices:
                 price = min(prices)
-        except Exception:
-            pass
+                debug["price_src"] = "offers_api"
+        except Exception as e:
+            debug["offers_err"] = str(e)
 
     return {
         "sku": sku,
@@ -152,6 +160,7 @@ def fetch_kaspi(sku):
         "price": price,
         "photos": photos,
         "article": article,
+        "_debug": debug,
     }
 
 
