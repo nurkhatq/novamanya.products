@@ -505,6 +505,15 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .add-dup-row{display:flex;align-items:center;gap:8px;background:#f7f8fa;border-radius:8px;padding:7px 10px;font-size:.78rem}
 .add-dup-name{flex:1;color:var(--txt);font-weight:600}
 .add-dup-sku{font-family:monospace;font-size:.68rem;color:var(--gry)}
+.add-kaspi-box{background:var(--blue-bg);border:1.5px solid var(--blue);border-radius:10px;padding:12px 14px;margin-bottom:18px}
+.add-kaspi-box label{font-size:.72rem;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:7px}
+.add-kaspi-row{display:flex;gap:8px;align-items:stretch}
+.add-kaspi-inp{flex:1;padding:9px 13px;border:1.5px solid #b3d0f0;border-radius:9px;font-size:.88rem;outline:none;color:var(--txt);background:#fff;transition:border-color .15s}
+.add-kaspi-inp:focus{border-color:var(--blue)}
+.add-kaspi-btn{padding:9px 18px;border:none;border-radius:9px;background:var(--blue);color:#fff;font-size:.84rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s}
+.add-kaspi-btn:hover{opacity:.85}
+.add-kaspi-btn:disabled{opacity:.5;cursor:default}
+.add-kaspi-status{font-size:.78rem;margin-top:7px;min-height:1.1em}
 .add-dup-rm{background:none;border:none;color:var(--gry);cursor:pointer;font-size:.8rem}.add-dup-rm:hover{color:var(--acc)}
 .add-comps-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
 .add-submit{width:100%;padding:12px;border-radius:10px;background:#1d3557;color:#fff;border:none;cursor:pointer;font-size:.92rem;font-weight:700;margin-top:20px;transition:background .2s}
@@ -691,6 +700,17 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 <div class="add-view" id="addView">
   <div class="add-card" id="addForm">
     <h2>Новый товар <span style="font-size:.72rem;font-weight:600;color:var(--blue);background:var(--blue-bg);padding:2px 8px;border-radius:6px">тестовая база</span></h2>
+
+    <!-- Kaspi autofill -->
+    <div class="add-kaspi-box">
+      <label>Автозаполнение из Kaspi</label>
+      <div class="add-kaspi-row">
+        <input class="add-kaspi-inp" id="af_kaspi_sku" type="text" placeholder="Введите SKU из Kaspi..."
+          onkeydown="if(event.key==='Enter')fetchKaspiSku()">
+        <button class="add-kaspi-btn" id="af_kaspi_btn" onclick="fetchKaspiSku()">Найти</button>
+      </div>
+      <div class="add-kaspi-status" id="af_kaspi_status"></div>
+    </div>
 
     <div class="add-row2">
       <div class="add-field">
@@ -1762,6 +1782,42 @@ let _afType = 'Товар';
 let _afComps = [];  // [{name, qty}]
 let _afDups  = [];  // [{sku, name}]
 
+async function fetchKaspiSku(){
+  const sku = document.getElementById('af_kaspi_sku').value.trim();
+  if(!sku){ return; }
+  const btn = document.getElementById('af_kaspi_btn');
+  const statusEl = document.getElementById('af_kaspi_status');
+  btn.disabled = true; btn.textContent = '...';
+  statusEl.style.color = 'var(--blue)';
+  statusEl.textContent = 'Поиск в Kaspi...';
+  try {
+    const r = await fetch(`/api/kaspi-sku/${encodeURIComponent(sku)}`);
+    const d = await r.json();
+    if(!r.ok || d.error){
+      statusEl.style.color = 'var(--acc)';
+      statusEl.textContent = '✗ ' + (d.error || 'Ошибка');
+      return;
+    }
+    document.getElementById('af_sku').value = sku;
+    if(d.title)     document.getElementById('af_name').value    = d.title;
+    if(d.brand)     document.getElementById('af_brand').value   = d.brand;
+    if(d.price)     document.getElementById('af_price').value   = d.price;
+    if(d.article)   document.getElementById('af_article').value = d.article;
+    if(d.photo_url){
+      const ta = document.getElementById('af_photos');
+      ta.value = d.photo_url;
+      updatePhotoPrev();
+    }
+    statusEl.style.color = 'var(--grn)';
+    statusEl.textContent = '✓ ' + (d.title || sku);
+  } catch(e) {
+    statusEl.style.color = 'var(--acc)';
+    statusEl.textContent = '✗ Ошибка сети';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Найти';
+  }
+}
+
 function setAddType(t){
   _afType = t;
   document.getElementById('atype_tovar').classList.toggle('on', t==='Товар');
@@ -1897,7 +1953,8 @@ async function submitNewProduct(){
 
 function resetAddForm(){
   _afComps=[]; _afDups=[]; _afType='Товар';
-  ['af_sku','af_name','af_price','af_brand','af_article','af_photos'].forEach(id=>document.getElementById(id).value='');
+  ['af_sku','af_name','af_price','af_brand','af_article','af_photos','af_kaspi_sku'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('af_kaspi_status').textContent='';
   document.getElementById('af_photos_prev').innerHTML='';
   document.getElementById('af_dups_list').innerHTML='';
   document.getElementById('af_comps_list').innerHTML='';
