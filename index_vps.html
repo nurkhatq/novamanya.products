@@ -1757,12 +1757,12 @@ async function renderNocatView(){
   const g = document.getElementById('nocatGrid');
   g.innerHTML = '';
   if(!items.length){ g.innerHTML='<div style="color:var(--gry);padding:32px;text-align:center">Все товары есть на Kaspi</div>'; return; }
-  // prefix → record map for cross-DB lookup (all records, including other nocat)
-  const prefixToRecord = {};
+  // prefix → [records] map for cross-DB lookup (all records, including other nocat)
+  const prefixToRecords = {};
   DATA.forEach(r => {
     if(!r) return;
     const pfx = r.main_sku.split('_')[0];
-    if(!prefixToRecord[pfx]) prefixToRecord[pfx] = r;
+    (prefixToRecords[pfx] = prefixToRecords[pfx] || []).push(r);
   });
 
   const frag = document.createDocumentFragment();
@@ -1814,7 +1814,7 @@ async function renderNocatView(){
           if(dupSkuWithSamePrefix){
             actionBtn = '<button class="promote-btn" onclick="promoteAndDelete(\'' + item.main_sku + '\',\'' + dupSkuWithSamePrefix + '\',this)">Применить дубль</button>';
           } else {
-            const existingRec = prefixToRecord[info.prefix]?.main_sku !== item.main_sku ? prefixToRecord[info.prefix] : null;
+            const existingRec = (prefixToRecords[info.prefix] || []).find(r => r.main_sku !== item.main_sku) || null;
             if(existingRec){
               const existName = (existingRec.catalog_info?.name || existingRec.name || existingRec.main_sku).slice(0,40).replace(/'/g,"\\'");
               actionBtn = '<span style="font-size:.72rem;color:#856404;background:#fff3cd;border-radius:5px;padding:2px 8px;border:1px solid #f0a500" title="' + existName + '">⚠ Уже есть: ' + existName + '</span>';
