@@ -1399,7 +1399,10 @@ function switchTab(tab){
   document.getElementById('carouselSection').style.display  = isMain ? '' : 'none';
   document.getElementById('catSection').style.display       = isMain ? '' : 'none';
   document.getElementById('checkView').classList.toggle('show', !isMain);
-  if(!isMain && !_ckLoaded) loadComparison();
+  if(!isMain){
+    if(!_ckLoaded) loadComparison();
+    else recomputeComparison();
+  }
 }
 
 // Build a card for Проверка — same look as main grid, extra dup markers
