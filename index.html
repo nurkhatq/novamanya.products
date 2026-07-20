@@ -514,6 +514,19 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .add-kaspi-btn:hover{opacity:.85}
 .add-kaspi-btn:disabled{opacity:.5;cursor:default}
 .add-kaspi-status{font-size:.78rem;margin-top:7px;min-height:1.1em}
+/* ══ SIMPLE VIEWS (Новые / Нет в Kaspi) ════════════════════════ */
+.simple-view{display:none;padding:20px 22px;max-width:1200px;margin:0 auto;width:100%}
+.simple-view.show{display:block}
+.simple-view-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px}
+.simple-view-title{font-size:1rem;font-weight:800;color:var(--txt)}
+.simple-view-sub{font-size:.76rem;color:var(--gry);margin-top:3px}
+.simple-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.nocat-check-btn{padding:8px 18px;border:1.5px solid var(--blue);border-radius:9px;background:var(--blue-bg);color:var(--blue);font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.nocat-check-btn:hover{background:var(--blue);color:#fff}
+.nocat-check-btn:disabled{opacity:.5;cursor:default}
+.nocat-result-badge{display:inline-block;font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:5px;margin-top:4px}
+.nocat-found{background:#d4edda;color:#155724}
+.nocat-notfound{background:#fff3cd;color:#856404}
 .add-dup-rm{background:none;border:none;color:var(--gry);cursor:pointer;font-size:.8rem}.add-dup-rm:hover{color:var(--acc)}
 .add-comps-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
 .add-submit{width:100%;padding:12px;border-radius:10px;background:#1d3557;color:#fff;border:none;cursor:pointer;font-size:.92rem;font-weight:700;margin-top:20px;transition:background .2s}
@@ -642,6 +655,8 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
   </div>
   <div class="tab-nav">
     <button class="tab-btn active" id="tabMain" onclick="switchTab('main')">База товаров</button>
+    <button class="tab-btn" id="tabNew" onclick="switchTab('new')">Новые <span class="tab-badge" id="newTabBadge" style="display:none">0</span></button>
+    <button class="tab-btn" id="tabNocat" onclick="switchTab('nocat')">Нет в Kaspi <span class="tab-badge" id="nocatTabBadge" style="display:none">0</span></button>
     <button class="tab-btn" id="tabCheck" onclick="switchTab('check')">Проверка <span class="tab-badge" id="checkTabBadge" style="display:none">0</span></button>
     <button class="tab-btn" id="tabAdd" onclick="switchTab('add')">+ Добавить товар</button>
   </div>
@@ -694,6 +709,30 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
     </div>
     <div class="grid" id="ckExtraGrid"></div>
   </div>
+</div>
+
+<!-- ══ НОВЫЕ ТОВАРЫ VIEW ══ -->
+<div class="simple-view" id="newView">
+  <div class="simple-view-header">
+    <div>
+      <div class="simple-view-title">Новые карточки</div>
+      <div class="simple-view-sub" id="newViewSub"></div>
+    </div>
+  </div>
+  <div class="simple-grid" id="newGrid"></div>
+</div>
+
+<!-- ══ НЕТ В KASPI VIEW ══ -->
+<div class="simple-view" id="nocatView">
+  <div class="simple-view-header">
+    <div>
+      <div class="simple-view-title">Нет в Kaspi</div>
+      <div class="simple-view-sub" id="nocatViewSub"></div>
+    </div>
+    <button class="nocat-check-btn" id="nocatCheckBtn" onclick="runNocatCheck()">Проверить на Kaspi</button>
+  </div>
+  <div id="nocatCheckProgress" style="display:none;padding:8px 0 4px;font-size:.78rem;color:var(--blue)"></div>
+  <div class="simple-grid" id="nocatGrid"></div>
 </div>
 
 <!-- ══ ДОБАВИТЬ ТОВАР VIEW ══ -->
@@ -1168,6 +1207,13 @@ function apply(){
   document.getElementById('rinfo').textContent=`Показано: ${filtered.length} из ${uniqueTotal} (${isDopOf.size} скрыто как дубли)${parts.length?' · '+parts.join(' · '):''}`;
   document.getElementById('ndBanner').style.display=(fFilter==='needs_review')?'block':'none';
   render();
+  // Update sidebar tab badges
+  const newCount = DATA.filter(r=>r&&r.flags?.includes('new_card')).length;
+  const nb = document.getElementById('newTabBadge');
+  if(nb){ nb.textContent=newCount; nb.style.display=newCount?'inline-block':'none'; }
+  const nocatCount = DATA.filter(r=>r&&!r.catalog_info?.status&&r.source!=='kaspi_only').length;
+  const ncb = document.getElementById('nocatTabBadge');
+  if(ncb){ ncb.textContent=nocatCount; ncb.style.display=nocatCount?'inline-block':'none'; }
 }
 
 function render(){
@@ -1553,19 +1599,100 @@ function switchTab(tab){
   const isMain  = tab==='main';
   const isCheck = tab==='check';
   const isAdd   = tab==='add';
-  document.getElementById('tabMain').classList.toggle('active', isMain);
-  document.getElementById('tabCheck').classList.toggle('active', isCheck);
-  document.getElementById('tabAdd').classList.toggle('active', isAdd);
+  const isNew   = tab==='new';
+  const isNocat = tab==='nocat';
+  ['tabMain','tabCheck','tabAdd','tabNew','tabNocat'].forEach(id=>
+    document.getElementById(id)?.classList.remove('active'));
+  const activeTab = {main:'tabMain',check:'tabCheck',add:'tabAdd',new:'tabNew',nocat:'tabNocat'}[tab];
+  if(activeTab) document.getElementById(activeTab).classList.add('active');
   document.querySelector('main').style.display              = isMain  ? '' : 'none';
   document.getElementById('carouselSection').style.display  = isMain  ? '' : 'none';
   document.getElementById('catSection').style.display       = isMain  ? '' : 'none';
   document.getElementById('checkView').classList.toggle('show', isCheck);
   document.getElementById('addView').classList.toggle('show', isAdd);
+  document.getElementById('newView').classList.toggle('show', isNew);
+  document.getElementById('nocatView').classList.toggle('show', isNocat);
   if(isCheck){
     if(!_ckLoaded) loadComparison();
     else recomputeComparison();
   }
+  if(isNew)   renderNewView();
+  if(isNocat) renderNocatView();
   if(isAdd && !currentUser){ alert('Войдите для добавления товаров'); switchTab('main'); }
+}
+
+// ── Новые карточки ────────────────────────────────────────────────
+function renderNewView(){
+  const items = DATA.filter(r => r && r.flags?.includes('new_card'));
+  const badge = document.getElementById('newTabBadge');
+  badge.textContent = items.length;
+  badge.style.display = items.length ? 'inline-block' : 'none';
+  document.getElementById('newViewSub').textContent =
+    `${items.length} карточк${items.length===1?'а':items.length<5?'и':'ек'} — созданы вручную или из Kaspi`;
+  const g = document.getElementById('newGrid');
+  g.innerHTML = '';
+  if(!items.length){ g.innerHTML='<div style="color:var(--gry);padding:32px;text-align:center">Новых карточек нет</div>'; return; }
+  const frag = document.createDocumentFragment();
+  items.forEach((item,i) => frag.appendChild(buildCard(item, i)));
+  g.appendChild(frag);
+}
+
+// ── Нет в Kaspi ──────────────────────────────────────────────────
+function isNocat(r){ return !r.catalog_info?.status && r.source !== 'kaspi_only'; }
+
+function renderNocatView(){
+  const items = DATA.filter(r => r && isNocat(r));
+  const badge = document.getElementById('nocatTabBadge');
+  badge.textContent = items.length;
+  badge.style.display = items.length ? 'inline-block' : 'none';
+  document.getElementById('nocatViewSub').textContent =
+    `${items.length} товаров без листинга на Kaspi`;
+  document.getElementById('nocatCheckProgress').style.display = 'none';
+  document.getElementById('nocatCheckBtn').disabled = false;
+  const g = document.getElementById('nocatGrid');
+  g.innerHTML = '';
+  if(!items.length){ g.innerHTML='<div style="color:var(--gry);padding:32px;text-align:center">Все товары есть на Kaspi</div>'; return; }
+  const frag = document.createDocumentFragment();
+  items.forEach((item,i) => frag.appendChild(buildCard(item, i)));
+  g.appendChild(frag);
+}
+
+let _nocatChecking = false;
+async function runNocatCheck(){
+  if(_nocatChecking) return;
+  const items = DATA.filter(r => r && isNocat(r));
+  if(!items.length) return;
+  _nocatChecking = true;
+  const btn = document.getElementById('nocatCheckBtn');
+  const prog = document.getElementById('nocatCheckProgress');
+  btn.disabled = true;
+  prog.style.display = 'block';
+  // Remove old result badges
+  document.querySelectorAll('.nocat-result-badge').forEach(el=>el.remove());
+  let done = 0;
+  prog.textContent = `Проверяем: 0 / ${items.length}`;
+  for(const item of items){
+    try {
+      const r = await fetch(
+        `https://kaspi.kz/yml/content/item/product/${item.main_sku}`,
+        {headers:{'accept':'application/json, */*','user-agent':'Mozilla/5.0','referer':'https://kaspi.kz/'}}
+      );
+      const found = r.ok && (await r.json())?.card?.name;
+      // Find the card element and inject result badge
+      const cardEl = document.querySelector(`[data-sku="${item.main_sku}"]`);
+      if(cardEl){
+        const badge = document.createElement('span');
+        badge.className = 'nocat-result-badge ' + (found ? 'nocat-found' : 'nocat-notfound');
+        badge.textContent = found ? '✓ Найден на Kaspi' : '✗ Нет на Kaspi';
+        cardEl.querySelector('.cb')?.appendChild(badge);
+      }
+    } catch(e){}
+    done++;
+    prog.textContent = `Проверяем: ${done} / ${items.length}`;
+  }
+  prog.textContent = `Готово: проверено ${done} товаров`;
+  btn.disabled = false;
+  _nocatChecking = false;
 }
 
 // Build a card for Проверка — same look as main grid, extra dup markers
