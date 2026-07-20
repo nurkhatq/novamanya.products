@@ -1757,14 +1757,6 @@ async function renderNocatView(){
   const g = document.getElementById('nocatGrid');
   g.innerHTML = '';
   if(!items.length){ g.innerHTML='<div style="color:var(--gry);padding:32px;text-align:center">Все товары есть на Kaspi</div>'; return; }
-  // prefix → [records] map: index by main_sku AND dop_skus prefixes
-  const prefixToRecords = {};
-  const addToMap = (pfx, r) => (prefixToRecords[pfx] = prefixToRecords[pfx] || []).push(r);
-  DATA.forEach(r => {
-    if(!r) return;
-    addToMap(r.main_sku.split('_')[0], r);
-    (r.dop_skus || []).forEach(d => addToMap(d.split('_')[0], r));
-  });
 
   const frag = document.createDocumentFragment();
   items.forEach((item, i) => {
@@ -1815,9 +1807,8 @@ async function renderNocatView(){
           if(dupSkuWithSamePrefix){
             actionBtn = '<button class="promote-btn" onclick="promoteAndDelete(\'' + item.main_sku + '\',\'' + dupSkuWithSamePrefix + '\',this)">Применить дубль</button>';
           } else {
-            const existingRec = (prefixToRecords[info.prefix] || []).find(r => r.main_sku !== item.main_sku) || null;
-            if(existingRec){
-              const existName = (existingRec.catalog_info?.name || existingRec.name || existingRec.main_sku).slice(0,40).replace(/'/g,"\\'");
+            if(info.db_match){
+              const existName = (info.db_match.name || info.db_match.main_sku).slice(0,40).replace(/'/g,"\\'");
               actionBtn = '<span style="font-size:.72rem;color:#856404;background:#fff3cd;border-radius:5px;padding:2px 8px;border:1px solid #f0a500" title="' + existName + '">⚠ Уже есть: ' + existName + '</span>';
             } else {
               actionBtn = '<button class="nocat-add-new-btn" onclick="addNocatAsNew(\'' + info.prefix + '\',\'' + item.main_sku + '\',\'' + escArt + '\',\'' + itemName + '\',' + JSON.stringify(info) + ',this)">Добавить как новый</button>';
