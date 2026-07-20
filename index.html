@@ -1576,7 +1576,6 @@ function renderComparison(){
     extraGrid.appendChild(buildCkCard(mainSku, new Set(), extraMap[mainSku], 'ckExtraGrid'));
   });
 
-  const total = missing.length + extra.length;
   document.getElementById('ckInfo').textContent = total
     ? `${missMainSkus.length} карточек с недостающими дублями · ${extraMainSkus.length} карточек с лишними дублями`
     : '✓ Всё проверено — расхождений нет';
