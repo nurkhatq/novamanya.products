@@ -1342,7 +1342,7 @@ function buildCard(item,idx){
       dot.addEventListener('click',e=>{e.stopPropagation();setPhoto(idx,photos,+dot.dataset.i);});
     });
   }
-  if(canExp) card.addEventListener('click',()=>tog(null,idx));
+  if(canExp) card.addEventListener('click',e=>{if(!e.target.closest('button,a'))tog(null,idx);});
   return card;
 }
 
