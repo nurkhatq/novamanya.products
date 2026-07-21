@@ -1215,10 +1215,9 @@ function apply(){
     if(q){
       const hayParts=[T(d),d.main_sku,d.article,B(d),d.catalog_info?.barcode,...(d.dop_skus||[])];
       if(d.ms_type==='Комплект'&&(d.components||[]).length){
-        const nm=getNameMap();
         (d.components).forEach(c=>{
           const {name}=parseComp(c);
-          const rec=nm[name];
+          const rec=findRecByName(name);
           if(rec){ hayParts.push(rec.main_sku,rec.article); }
         });
       }
@@ -1457,11 +1456,18 @@ function getCompVal(mainSku){
   return name+' (x'+qtyStr+')';
 }
 
-function buildCompRows(comps, mainSku){
+function findRecByName(name){
   const nm=getNameMap();
+  if(nm[name]) return nm[name];
+  // fallback: case-insensitive search in DATA
+  const low=name.toLowerCase();
+  return DATA.find(r=>r&&r.name&&r.name.trim().toLowerCase()===low)||null;
+}
+
+function buildCompRows(comps, mainSku){
   return comps.map(c=>{
     const {name,qty}=parseComp(c);
-    const rec=nm[name]||{};
+    const rec=findRecByName(name)||{};
     const cat=rec.catalog_info||{};
     const ph=cat.photos?.[0]||'';
     const sku=rec.main_sku||'';
