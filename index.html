@@ -1218,7 +1218,7 @@ function apply(){
         const nm=getNameMap();
         (d.components).forEach(c=>{
           const {name}=parseComp(c);
-          const rec=nm[name]||nm[decodeHtmlEntities(name)];
+          const rec=nm[name];
           if(rec){ hayParts.push(rec.main_sku,rec.article); }
         });
       }
@@ -1369,22 +1369,22 @@ let _nameMap=null;
 function decodeHtmlEntities(s){
   return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
 }
+function normName(s){
+  return decodeHtmlEntities(s.trim()).normalize('NFC');
+}
 function getNameMap(){
   if(!_nameMap){
     _nameMap={};
     DATA.forEach(r=>{
       if(!r||!r.name) return;
-      const n=r.name.trim();
-      _nameMap[n]=r;
-      const decoded=decodeHtmlEntities(n);
-      if(decoded!==n) _nameMap[decoded]=r;
+      _nameMap[normName(r.name)]=r;
     });
   }
   return _nameMap;
 }
 function parseComp(c){
   const m=c.match(/^(.*?)\s*\(x([\d.]+)\)$/);
-  return m?{name:m[1].trim(),qty:parseFloat(m[2])}:{name:c.trim(),qty:1};
+  return m?{name:normName(m[1]),qty:parseFloat(m[2])}:{name:normName(c),qty:1};
 }
 function compSearchItems(q){
   if(!q||q.length<2) return [];
