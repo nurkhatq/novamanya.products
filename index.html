@@ -1467,6 +1467,41 @@ function findRecByName(name){
   return DATA.find(r=>r&&r.name&&r.name.trim().toLowerCase()===low)||null;
 }
 
+function buildGiftMaskBundles(){
+  const pool=getGiftMaskPool();
+  if(!pool.size) return '';
+  // Find all bundles with at least one component in pool
+  const bundles=[];
+  DATA.forEach(r=>{
+    if(!r||r.main_sku==='GIFT_MASK'||r.ms_type!=='Комплект') return;
+    const maskComps=(r.components||[]).filter(c=>pool.has(normName(parseComp(c).name)));
+    if(maskComps.length) bundles.push({r,maskComps});
+  });
+  if(!bundles.length) return `<div class="comp-blk" style="margin-top:8px"><div class="comp-blk-t"><span>Наборы с масками из пула (0)</span></div><div style="color:var(--gry);font-size:.75rem;padding:6px">Нет наборов — нажмите "→ Подарочная" в нужном комплекте вручную</div></div>`;
+
+  const rows=bundles.map(({r,maskComps})=>{
+    const name=(r.catalog_info?.title||r.name||r.main_sku).slice(0,55);
+    const compBtns=maskComps.map(c=>{
+      const {name:cn}=parseComp(c);
+      const safe=c.replace(/'/g,"\\'");
+      return `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+        <span style="font-size:.72rem;color:var(--txt2);flex:1">${cn.slice(0,50)}</span>
+        <button class="ci-gift-btn" onclick="event.stopPropagation();replaceWithGiftMask('${r.main_sku}','${safe}',this)">→ Подарочная</button>
+      </div>`;
+    }).join('');
+    return `<div style="border:1px solid var(--brd);border-radius:7px;padding:8px 10px;margin-bottom:6px">
+      <div style="font-size:.76rem;font-weight:700;color:var(--txt)">${name}</div>
+      <div style="font-size:.68rem;color:var(--txt2);margin-bottom:2px">${r.main_sku}</div>
+      ${compBtns}
+    </div>`;
+  }).join('');
+
+  return `<div class="comp-blk" style="margin-top:8px">
+    <div class="comp-blk-t"><span>Наборы с масками из пула (${bundles.length})</span></div>
+    <div style="max-height:400px;overflow-y:auto;padding:4px 0">${rows}</div>
+  </div>`;
+}
+
 function getGiftMaskPool(){
   const gm=DATA.find(r=>r&&r.main_sku==='GIFT_MASK');
   if(!gm) return new Set();
@@ -1562,13 +1597,11 @@ function buildDp(item){
     const isGiftPool=item.flags?.includes('gift_mask_pool');
     const label=isBundle?`Компоненты (${comps.length})`:`Компоненты (${comps.length}) · добавлено к товару`;
     const addComp=currentUser?buildCompAddInput(item.main_sku):'';
-    const applyBtn=isGiftPool&&currentUser
-      ?`<button class="dp-add-btn" style="margin-top:8px;background:#6f42c1;border-color:#6f42c1" onclick="event.stopPropagation();applyGiftMaskToAll(this)">Применить к наборам ↓</button>`
-      :'';
     html+=`<div class="comp-blk">
       <div class="comp-blk-t"><span>${label}</span></div>
-      ${buildCompRows(comps,item.main_sku,isGiftPool)}${addComp}${applyBtn}
+      ${buildCompRows(comps,item.main_sku,isGiftPool)}${addComp}
     </div>`;
+    if(isGiftPool) html+=buildGiftMaskBundles();
   } else if(currentUser){
     // Regular Товар with no comps — collapsed "convert to bundle" section
     const cid='cbx_'+item.main_sku.replace(/[^a-z0-9]/gi,'_');
@@ -1891,34 +1924,6 @@ async function replaceWithGiftMask(mainSku, compStr, btn){
   else { btn.textContent='Ошибка'; }
 }
 
-async function applyGiftMaskToAll(btn){
-  if(!currentUser){ alert('Войдите для редактирования'); return; }
-  const pool=getGiftMaskPool();
-  if(!pool.size){ alert('Пул масок пустой'); return; }
-  const affected=[];
-  DATA.forEach(r=>{
-    if(!r||r.main_sku==='GIFT_MASK') return;
-    (r.components||[]).forEach(c=>{
-      const {name}=parseComp(c);
-      if(pool.has(normName(name))) affected.push({sku:r.main_sku,comp:c,name:r.name||r.main_sku});
-    });
-  });
-  if(!affected.length){ alert('Нет наборов с масками из пула'); return; }
-  const list=affected.map(x=>`• ${x.name.slice(0,50)}\n  ${x.comp.slice(0,60)}`).join('\n');
-  if(!confirm(`Заменить на "Подарочная маска" в ${affected.length} компонентах:\n\n${list}\n\nПродолжить?`)) return;
-  btn.disabled=true; btn.textContent='Применяю...';
-  let ok=0;
-  for(const {sku,comp} of affected){
-    const r1=await apiAction({action:'remove_component',main_sku:sku,comp_name:comp});
-    if(r1){
-      const r2=await apiAction({action:'add_component',main_sku:sku,comp_name:'Подарочная маска (x1.0)'});
-      if(r2) ok++;
-    }
-  }
-  btn.textContent=`✓ Применено ${ok}/${affected.length}`;
-  _nameMap=null;
-  await refreshFromServer();
-}
 
 async function promoteAndDelete(nocatSku, newMainSku, btn){
   if(!currentUser){ alert('Войдите для редактирования'); return; }
