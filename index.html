@@ -315,6 +315,9 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .ci-qty{font-size:.68rem;font-weight:700;color:#fff;background:#9775fa;padding:2px 6px;border-radius:6px}
 .ci-rm{position:absolute;top:5px;right:5px;background:none;border:none;color:#ccc;font-size:.75rem;cursor:pointer;line-height:1;padding:1px 3px;border-radius:4px}
 .ci-rm:hover{color:var(--acc);background:#fff5f5}
+.ci-gift-btn{padding:2px 7px;font-size:.66rem;font-weight:700;border-radius:5px;border:1.5px solid #6f42c1;background:#f3eeff;color:#6f42c1;cursor:pointer;white-space:nowrap;margin-left:4px}
+.ci-gift-btn:hover{background:#6f42c1;color:#fff}
+.ci-gift-btn:disabled{opacity:.5;cursor:default}
 /* Comp search dropdown */
 .comp-search-wrap{position:relative;flex:1}
 .comp-search-res{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--blue);border-radius:9px;margin-top:3px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:var(--sh2)}
@@ -1464,10 +1467,18 @@ function findRecByName(name){
   return DATA.find(r=>r&&r.name&&r.name.trim().toLowerCase()===low)||null;
 }
 
-function buildCompRows(comps, mainSku){
+function getGiftMaskPool(){
+  const gm=DATA.find(r=>r&&r.main_sku==='GIFT_MASK');
+  if(!gm) return new Set();
+  return new Set((gm.components||[]).map(c=>normName(parseComp(c).name)));
+}
+
+function buildCompRows(comps, mainSku, isGiftPool){
+  const pool=isGiftPool?null:getGiftMaskPool();
   return comps.map(c=>{
     const {name,qty}=parseComp(c);
     const rec=findRecByName(name)||{};
+    const inPool=pool&&pool.has(normName(name));
     const cat=rec.catalog_info||{};
     const ph=cat.photos?.[0]||'';
     const sku=rec.main_sku||'';
@@ -1489,9 +1500,12 @@ function buildCompRows(comps, mainSku){
     const rmComp=currentUser
       ?`<button class="ci-rm" onclick="event.stopPropagation();rmComp('${mainSku}','${c.replace(/'/g,"\\'")}')">✕</button>`
       :'';
+    const giftBtn=inPool&&currentUser
+      ?`<button class="ci-gift-btn" title="Заменить на Подарочную маску" onclick="event.stopPropagation();replaceWithGiftMask('${mainSku}','${c.replace(/'/g,"\\'")}',this)">→ Подарочная</button>`
+      :'';
     return `<div class="ci">${phEl}<div class="ci-info">
       <div class="ci-title">${name}</div>
-      <div class="ci-meta">${skuEl}${artEl}${qtyEl}${pr}${st}</div>
+      <div class="ci-meta">${skuEl}${artEl}${qtyEl}${pr}${st}${giftBtn}</div>
     </div>${rmComp}</div>`;
   }).join('');
 }
@@ -1545,12 +1559,15 @@ function buildDp(item){
   const hasComps=comps.length>0;
 
   if(isBundle||hasComps){
-    // Full visible component block
+    const isGiftPool=item.flags?.includes('gift_mask_pool');
     const label=isBundle?`Компоненты (${comps.length})`:`Компоненты (${comps.length}) · добавлено к товару`;
     const addComp=currentUser?buildCompAddInput(item.main_sku):'';
+    const applyBtn=isGiftPool&&currentUser
+      ?`<button class="dp-add-btn" style="margin-top:8px;background:#6f42c1;border-color:#6f42c1" onclick="event.stopPropagation();applyGiftMaskToAll(this)">Применить к наборам ↓</button>`
+      :'';
     html+=`<div class="comp-blk">
       <div class="comp-blk-t"><span>${label}</span></div>
-      ${buildCompRows(comps,item.main_sku)}${addComp}
+      ${buildCompRows(comps,item.main_sku,isGiftPool)}${addComp}${applyBtn}
     </div>`;
   } else if(currentUser){
     // Regular Товар with no comps — collapsed "convert to bundle" section
@@ -1861,6 +1878,46 @@ async function renderNocatView(){
     frag.appendChild(card);
   });
   g.appendChild(frag);
+}
+
+async function replaceWithGiftMask(mainSku, compStr, btn){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  btn.disabled=true; btn.textContent='...';
+  const newComp='Подарочная маска (x1.0)';
+  const ok1=await apiAction({action:'remove_component',main_sku:mainSku,comp_name:compStr});
+  if(!ok1){ btn.disabled=false; btn.textContent='→ Подарочная'; return; }
+  const ok2=await apiAction({action:'add_component',main_sku:mainSku,comp_name:newComp});
+  if(ok2){ _nameMap=null; await refreshFromServer(); }
+  else { btn.textContent='Ошибка'; }
+}
+
+async function applyGiftMaskToAll(btn){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  const pool=getGiftMaskPool();
+  if(!pool.size){ alert('Пул масок пустой'); return; }
+  const affected=[];
+  DATA.forEach(r=>{
+    if(!r||r.main_sku==='GIFT_MASK') return;
+    (r.components||[]).forEach(c=>{
+      const {name}=parseComp(c);
+      if(pool.has(normName(name))) affected.push({sku:r.main_sku,comp:c,name:r.name||r.main_sku});
+    });
+  });
+  if(!affected.length){ alert('Нет наборов с масками из пула'); return; }
+  const list=affected.map(x=>`• ${x.name.slice(0,50)}\n  ${x.comp.slice(0,60)}`).join('\n');
+  if(!confirm(`Заменить на "Подарочная маска" в ${affected.length} компонентах:\n\n${list}\n\nПродолжить?`)) return;
+  btn.disabled=true; btn.textContent='Применяю...';
+  let ok=0;
+  for(const {sku,comp} of affected){
+    const r1=await apiAction({action:'remove_component',main_sku:sku,comp_name:comp});
+    if(r1){
+      const r2=await apiAction({action:'add_component',main_sku:sku,comp_name:'Подарочная маска (x1.0)'});
+      if(r2) ok++;
+    }
+  }
+  btn.textContent=`✓ Применено ${ok}/${affected.length}`;
+  _nameMap=null;
+  await refreshFromServer();
 }
 
 async function promoteAndDelete(nocatSku, newMainSku, btn){
