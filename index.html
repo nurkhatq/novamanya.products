@@ -1213,8 +1213,16 @@ function apply(){
     if(bq && B(d).toLowerCase()!==bq) return false;
     if(fCat && CL(d)!==fCat) return false;
     if(q){
-      const hay=[T(d),d.main_sku,d.article,B(d),
-        d.catalog_info?.barcode,...(d.dop_skus||[])].filter(Boolean).join(' ').toLowerCase();
+      const hayParts=[T(d),d.main_sku,d.article,B(d),d.catalog_info?.barcode,...(d.dop_skus||[])];
+      if(d.ms_type==='Комплект'&&(d.components||[]).length){
+        const nm=getNameMap();
+        (d.components).forEach(c=>{
+          const {name}=parseComp(c);
+          const rec=nm[name]||nm[decodeHtmlEntities(name)];
+          if(rec){ hayParts.push(rec.main_sku,rec.article); }
+        });
+      }
+      const hay=hayParts.filter(Boolean).join(' ').toLowerCase();
       if(!hay.includes(q)) return false;
     }
     return true;
@@ -1358,10 +1366,19 @@ function tyBadge(item){
 
 // ── Component helpers ─────────────────────────────────────────────
 let _nameMap=null;
+function decodeHtmlEntities(s){
+  return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+}
 function getNameMap(){
   if(!_nameMap){
     _nameMap={};
-    DATA.forEach(r=>{if(r&&r.name)_nameMap[r.name.trim()]=r;});
+    DATA.forEach(r=>{
+      if(!r||!r.name) return;
+      const n=r.name.trim();
+      _nameMap[n]=r;
+      const decoded=decodeHtmlEntities(n);
+      if(decoded!==n) _nameMap[decoded]=r;
+    });
   }
   return _nameMap;
 }
