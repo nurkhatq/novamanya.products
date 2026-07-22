@@ -1743,18 +1743,17 @@ function switchTab(tab){
 }
 
 function renderGiftView(){
-  const pool = getGiftMaskPool();
-  const sub  = document.getElementById('giftViewSub');
-  const grid = document.getElementById('giftGrid');
+  const pool  = getGiftMaskPool();
+  const sub   = document.getElementById('giftViewSub');
+  const grid  = document.getElementById('giftGrid');
   const badge = document.getElementById('giftTabBadge');
 
   if(!pool.size){
     sub.textContent = 'Пул масок не найден (карточка GIFT_MASK)';
-    grid.innerHTML = '<div style="color:var(--gry);padding:32px;text-align:center">Нет карточки GIFT_MASK в базе</div>';
+    grid.innerHTML  = '<div style="color:var(--gry);padding:32px;text-align:center">Нет карточки GIFT_MASK в базе</div>';
     return;
   }
 
-  // Все комплекты с хотя бы одним компонентом из пула
   const bundles = [];
   DATA.forEach(r => {
     if(!r || r.main_sku==='GIFT_MASK' || r.ms_type!=='Комплект') return;
@@ -1762,7 +1761,7 @@ function renderGiftView(){
     if(maskComps.length) bundles.push({r, maskComps});
   });
 
-  sub.textContent = `${bundles.length} наборов содержат маски из пула · Пул: ${pool.size} масок`;
+  sub.textContent = `${bundles.length} наборов с масками из пула · Пул: ${pool.size} масок`;
   badge.textContent = bundles.length;
   badge.style.display = bundles.length ? 'inline-block' : 'none';
 
@@ -1771,37 +1770,79 @@ function renderGiftView(){
     return;
   }
 
-  // Пул масок (свёрнутый список)
-  const poolList = [...pool].map(n=>`<li style="font-size:.72rem;color:var(--txt2);padding:1px 0">${n}</li>`).join('');
-
-  let html = `
-    <details style="margin-bottom:16px;background:var(--sur);border:1px solid var(--brd);border-radius:8px;padding:10px 14px">
-      <summary style="cursor:pointer;font-size:.78rem;font-weight:700;color:var(--txt2);user-select:none">
-        Маски в пуле (${pool.size})
-      </summary>
-      <ul style="list-style:none;margin-top:8px;columns:2;gap:16px">${poolList}</ul>
-    </details>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">`;
+  grid.innerHTML = '';
+  grid.className = 'simple-grid';
 
   bundles.forEach(({r, maskComps}) => {
-    const name = (r.catalog_info?.title || r.name || r.main_sku).slice(0, 60);
-    const compBtns = maskComps.map(c => {
-      const {name: cn} = parseComp(c);
-      const safe = c.replace(/'/g,"\\'");
-      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--brd)">
-        <span style="font-size:.72rem;color:var(--txt2);flex:1;line-height:1.3">${cn.slice(0,52)}</span>
-        <button class="ci-gift-btn" onclick="replaceWithGiftMaskAndRefreshView('${r.main_sku}','${safe}',this)">→ Подарочная</button>
-      </div>`;
-    }).join('');
-    html += `<div style="background:var(--sur);border:1px solid var(--brd);border-radius:9px;padding:12px 14px">
-      <div style="font-size:.8rem;font-weight:700;color:var(--txt);margin-bottom:2px">${name}</div>
-      <div style="font-size:.68rem;color:var(--gry);margin-bottom:6px">${r.main_sku}</div>
-      ${compBtns}
-    </div>`;
-  });
+    const cat     = r.catalog_info || {};
+    const photos  = cat.photos || [];
+    const title   = cat.title || r.name || r.main_sku;
+    const photo   = photos[0] || '';
+    const allComps = r.components || [];
+    const maskSet  = new Set(maskComps.map(c => c));
 
-  html += '</div>';
-  grid.innerHTML = html;
+    // Card element
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.cssText = 'display:flex;flex-direction:column';
+
+    // Photo
+    const phHtml = photo
+      ? `<div class="ph"><img src="${photo}" alt="" loading="lazy"></div>`
+      : `<div class="ph"><div class="ph-ph"><span>Нет фото</span></div></div>`;
+
+    // Header
+    const headerHtml = `
+      <div class="cb">
+        <div class="cb-title">${title}</div>
+        <div class="cb-skus">
+          <span class="sku sku-main" onclick="event.stopPropagation();cpTxt('${r.main_sku}',this)" title="Скопировать">${r.main_sku}</span>
+        </div>
+      </div>`;
+
+    // Components — ALL of them
+    const compsHtml = allComps.map(c => {
+      const {name: cn} = parseComp(c);
+      const inPool = pool.has(normName(cn));
+      const compRec = findRecByName(cn) || {};
+      const compCat = compRec.catalog_info || {};
+      const ph2 = compCat.photos?.[0] || '';
+      const phEl = ph2
+        ? `<img class="ci-ph" src="${ph2}" alt="" loading="lazy">`
+        : `<div class="ci-ph-ph" style="${inPool?'':'background:#f0f0f0;color:#bbb'}">🎭</div>`;
+      const safe = c.replace(/'/g,"\\'");
+      const giftBtn = inPool && currentUser
+        ? `<button class="ci-gift-btn" onclick="replaceWithGiftMaskAndRefreshView('${r.main_sku}','${safe}',this)">→ Подарочная</button>`
+        : '';
+
+      if(inPool){
+        return `<div class="ci">${phEl}
+          <div class="ci-info">
+            <div class="ci-title">${cn}</div>
+            <div class="ci-meta">${giftBtn}</div>
+          </div>
+        </div>`;
+      } else {
+        // Non-pool component — grey, no border highlight
+        return `<div class="ci" style="border-color:var(--brd);opacity:.55">${phEl}
+          <div class="ci-info">
+            <div class="ci-title" style="color:var(--gry)">${cn}</div>
+          </div>
+        </div>`;
+      }
+    }).join('');
+
+    const compsBlock = `
+      <div style="padding:8px 10px;border-top:1px solid var(--brd);flex:1">
+        <div style="font-size:.68rem;font-weight:700;color:var(--pur);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">
+          Компоненты (${allComps.length}) · маски: ${maskComps.length}
+        </div>
+        ${compsHtml}
+      </div>`;
+
+    card.innerHTML = phHtml + headerHtml + compsBlock;
+    grid.appendChild(card);
+  });
 }
 
 async function replaceWithGiftMaskAndRefreshView(mainSku, compStr, btn){
