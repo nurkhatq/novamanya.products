@@ -675,6 +675,7 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
     <button class="tab-btn active" id="tabMain" onclick="switchTab('main')">База товаров</button>
     <button class="tab-btn" id="tabNew" onclick="switchTab('new')">Новые <span class="tab-badge" id="newTabBadge" style="display:none">0</span></button>
     <button class="tab-btn" id="tabNocat" onclick="switchTab('nocat')">Нет в Kaspi <span class="tab-badge" id="nocatTabBadge" style="display:none">0</span></button>
+    <button class="tab-btn" id="tabGift" onclick="switchTab('gift')">Подарочные маски <span class="tab-badge" id="giftTabBadge" style="display:none">0</span></button>
     <button class="tab-btn" id="tabCheck" onclick="switchTab('check')">Проверка <span class="tab-badge" id="checkTabBadge" style="display:none">0</span></button>
     <button class="tab-btn" id="tabAdd" onclick="switchTab('add')">+ Добавить товар</button>
     <button class="tab-btn" id="tabRenames" onclick="switchTab('renames')">Обновлённые SKU <span class="tab-badge" id="renamesTabBadge" style="display:none">0</span></button>
@@ -752,6 +753,17 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
   </div>
   <div id="nocatCheckProgress" style="display:none;padding:8px 0 4px;font-size:.78rem;color:var(--blue)"></div>
   <div class="simple-grid" id="nocatGrid"></div>
+</div>
+
+<!-- ══ ПОДАРОЧНЫЕ МАСКИ VIEW ══ -->
+<div class="simple-view" id="giftView">
+  <div class="simple-view-header">
+    <div>
+      <div class="simple-view-title">Подарочные маски</div>
+      <div class="simple-view-sub" id="giftViewSub"></div>
+    </div>
+  </div>
+  <div id="giftGrid"></div>
 </div>
 
 <div class="simple-view" id="renamesView">
@@ -1250,6 +1262,11 @@ function apply(){
   const nocatCount = DATA.filter(r=>r&&!r.catalog_info?.status&&r.source!=='kaspi_only').length;
   const ncb = document.getElementById('nocatTabBadge');
   if(ncb){ ncb.textContent=nocatCount; ncb.style.display=nocatCount?'inline-block':'none'; }
+  // Gift mask badge
+  const giftPool = getGiftMaskPool();
+  const giftCount = DATA.filter(r=>r&&r.main_sku!=='GIFT_MASK'&&r.ms_type==='Комплект'&&(r.components||[]).some(c=>giftPool.has(normName(parseComp(c).name)))).length;
+  const gb = document.getElementById('giftTabBadge');
+  if(gb){ gb.textContent=giftCount; gb.style.display=giftCount?'inline-block':'none'; }
 }
 
 function render(){
@@ -1700,9 +1717,10 @@ function switchTab(tab){
   const isAdd   = tab==='add';
   const isNew   = tab==='new';
   const isNocat = tab==='nocat';
-  ['tabMain','tabCheck','tabAdd','tabNew','tabNocat','tabRenames'].forEach(id=>
+  const isGift  = tab==='gift';
+  ['tabMain','tabCheck','tabAdd','tabNew','tabNocat','tabRenames','tabGift'].forEach(id=>
     document.getElementById(id)?.classList.remove('active'));
-  const activeTab = {main:'tabMain',check:'tabCheck',add:'tabAdd',new:'tabNew',nocat:'tabNocat',renames:'tabRenames'}[tab];
+  const activeTab = {main:'tabMain',check:'tabCheck',add:'tabAdd',new:'tabNew',nocat:'tabNocat',renames:'tabRenames',gift:'tabGift'}[tab];
   if(activeTab) document.getElementById(activeTab).classList.add('active');
   document.querySelector('main').style.display              = isMain  ? '' : 'none';
   document.getElementById('carouselSection').style.display  = isMain  ? '' : 'none';
@@ -1712,6 +1730,7 @@ function switchTab(tab){
   document.getElementById('newView').classList.toggle('show', isNew);
   document.getElementById('nocatView').classList.toggle('show', isNocat);
   document.getElementById('renamesView').classList.toggle('show', tab==='renames');
+  document.getElementById('giftView').classList.toggle('show', isGift);
   if(tab==='renames') renderRenamesView();
   if(isCheck){
     if(!_ckLoaded) loadComparison();
@@ -1719,7 +1738,76 @@ function switchTab(tab){
   }
   if(isNew)   renderNewView();
   if(isNocat) renderNocatView(); // async, runs in background
+  if(isGift)  renderGiftView();
   if(isAdd && !currentUser){ alert('Войдите для добавления товаров'); switchTab('main'); }
+}
+
+function renderGiftView(){
+  const pool = getGiftMaskPool();
+  const sub  = document.getElementById('giftViewSub');
+  const grid = document.getElementById('giftGrid');
+  const badge = document.getElementById('giftTabBadge');
+
+  if(!pool.size){
+    sub.textContent = 'Пул масок не найден (карточка GIFT_MASK)';
+    grid.innerHTML = '<div style="color:var(--gry);padding:32px;text-align:center">Нет карточки GIFT_MASK в базе</div>';
+    return;
+  }
+
+  // Все комплекты с хотя бы одним компонентом из пула
+  const bundles = [];
+  DATA.forEach(r => {
+    if(!r || r.main_sku==='GIFT_MASK' || r.ms_type!=='Комплект') return;
+    const maskComps = (r.components||[]).filter(c => pool.has(normName(parseComp(c).name)));
+    if(maskComps.length) bundles.push({r, maskComps});
+  });
+
+  sub.textContent = `${bundles.length} наборов содержат маски из пула · Пул: ${pool.size} масок`;
+  badge.textContent = bundles.length;
+  badge.style.display = bundles.length ? 'inline-block' : 'none';
+
+  if(!bundles.length){
+    grid.innerHTML = '<div style="color:var(--gry);padding:32px;text-align:center">Нет наборов с масками из пула</div>';
+    return;
+  }
+
+  // Пул масок (свёрнутый список)
+  const poolList = [...pool].map(n=>`<li style="font-size:.72rem;color:var(--txt2);padding:1px 0">${n}</li>`).join('');
+
+  let html = `
+    <details style="margin-bottom:16px;background:var(--sur);border:1px solid var(--brd);border-radius:8px;padding:10px 14px">
+      <summary style="cursor:pointer;font-size:.78rem;font-weight:700;color:var(--txt2);user-select:none">
+        Маски в пуле (${pool.size})
+      </summary>
+      <ul style="list-style:none;margin-top:8px;columns:2;gap:16px">${poolList}</ul>
+    </details>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">`;
+
+  bundles.forEach(({r, maskComps}) => {
+    const name = (r.catalog_info?.title || r.name || r.main_sku).slice(0, 60);
+    const compBtns = maskComps.map(c => {
+      const {name: cn} = parseComp(c);
+      const safe = c.replace(/'/g,"\\'");
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--brd)">
+        <span style="font-size:.72rem;color:var(--txt2);flex:1;line-height:1.3">${cn.slice(0,52)}</span>
+        <button class="ci-gift-btn" onclick="replaceWithGiftMaskAndRefreshView('${r.main_sku}','${safe}',this)">→ Подарочная</button>
+      </div>`;
+    }).join('');
+    html += `<div style="background:var(--sur);border:1px solid var(--brd);border-radius:9px;padding:12px 14px">
+      <div style="font-size:.8rem;font-weight:700;color:var(--txt);margin-bottom:2px">${name}</div>
+      <div style="font-size:.68rem;color:var(--gry);margin-bottom:6px">${r.main_sku}</div>
+      ${compBtns}
+    </div>`;
+  });
+
+  html += '</div>';
+  grid.innerHTML = html;
+}
+
+async function replaceWithGiftMaskAndRefreshView(mainSku, compStr, btn){
+  await replaceWithGiftMask(mainSku, compStr, btn);
+  // После замены перерисовываем вкладку
+  if(btn.textContent !== 'Ошибка') renderGiftView();
 }
 
 // ── Обновлённые SKU ──────────────────────────────────────────────────────────────────
