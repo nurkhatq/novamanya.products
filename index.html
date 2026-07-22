@@ -1850,6 +1850,7 @@ async function renderNocatView(){
         <button class="promote-btn" onclick="promoteAndDelete('${item.main_sku}','${rev.best_dup}',this)">
           Применить
         </button>`;
+      box.addEventListener('click', e => e.stopPropagation());
       card.appendChild(box);
     }
     // Action box — показываем данные сразу из _nocatResults
@@ -1891,7 +1892,7 @@ async function renderNocatView(){
         }
         return '<div class="nocat-prefix-row">' +
           '<span class="nocat-prefix-label" style="min-width:60px">' + label + '</span>' +
-          '<span style="font-family:monospace;font-size:.72rem;color:var(--txt2)">' + info.prefix + '</span>' +
+          '<span class="sku sku-main" style="font-size:.72rem" onclick="event.stopPropagation();cpTxt(\'' + info.prefix + '\',this)" title="Нажмите чтобы скопировать">' + info.prefix + '</span>' +
           '<span style="color:' + (onSale?'var(--grn)':'var(--red)') + ';font-weight:700;font-size:.75rem">' + (onSale?'✓ в продаже':'✗ нет') + '</span>' +
           (info.title ? '<span style="font-size:.72rem;color:var(--txt2)">' + info.title.slice(0,35) + '</span>' : '') +
           actionBtn +
@@ -1907,6 +1908,7 @@ async function renderNocatView(){
       '</div>' +
       resultHtml;
 
+    actionBox.addEventListener('click', e => e.stopPropagation());
     card.appendChild(actionBox);
     frag.appendChild(card);
   });
