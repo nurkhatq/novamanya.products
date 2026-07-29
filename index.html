@@ -572,6 +572,26 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
 .ck-section-bar span{background:var(--gry-bg);color:var(--gry);border-radius:20px;padding:1px 8px;font-size:.7rem}
 .ck-section-bar.miss span{background:#e7f5ff;color:var(--blue)}
 .ck-section-bar.extra span{background:#fff3e0;color:#d9480f}
+/* ══ ДУБЛИ ШК VIEW ═══════════════════════════════════════════════ */
+.bc-group{background:var(--card);border:1px solid var(--brd);border-radius:12px;margin-bottom:18px;overflow:hidden}
+.bc-group-header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(255,90,60,.06);border-bottom:1px solid var(--brd)}
+.bc-group-bc{font-family:monospace;font-size:1rem;font-weight:700;color:#d9480f;letter-spacing:.03em}
+.bc-group-count{font-size:.75rem;color:var(--gry);background:var(--gry-bg);border-radius:20px;padding:2px 10px}
+.bc-group-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0;padding:0}
+.bc-card{padding:14px 16px;border-right:1px solid var(--brd);border-bottom:1px solid var(--brd)}
+.bc-card:last-child{border-right:none}
+.bc-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.bc-chip{display:inline-flex;align-items:center;gap:4px;background:var(--gry-bg);border:1px solid var(--brd);border-radius:6px;padding:2px 7px;font-size:.72rem;font-family:monospace}
+.bc-chip.bc-conflict{background:#fff0ed;border-color:#ffb8a8;color:#c0392b;font-weight:700}
+.bc-del-btn{background:none;border:none;cursor:pointer;color:#c0392b;font-size:.8rem;padding:0 1px;line-height:1;opacity:.7}
+.bc-del-btn:hover{opacity:1}
+.bc-del-btn:disabled{opacity:.4;cursor:default}
+.bc-add-btn{font-size:.72rem;color:var(--acc);background:none;border:1px dashed var(--acc);border-radius:6px;padding:2px 8px;cursor:pointer;margin-top:2px}
+.bc-add-btn:hover{background:rgba(var(--acc-rgb),.07)}
+.bc-add-row{display:flex;align-items:center;gap:6px;margin:6px 0 4px;flex-wrap:wrap}
+.bc-add-input{flex:1;min-width:140px;border:1px solid var(--brd);border-radius:6px;padding:4px 8px;font-size:.8rem;background:var(--bg);color:var(--txt)}
+.bc-add-ok{background:var(--acc);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:.78rem;cursor:pointer}
+.bc-add-cancel{background:var(--gry-bg);color:var(--txt2);border:1px solid var(--brd);border-radius:6px;padding:4px 10px;font-size:.78rem;cursor:pointer}
 </style>
 </head>
 <body>
@@ -679,6 +699,7 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
     <button class="tab-btn" id="tabCheck" onclick="switchTab('check')">Проверка <span class="tab-badge" id="checkTabBadge" style="display:none">0</span></button>
     <button class="tab-btn" id="tabAdd" onclick="switchTab('add')">+ Добавить товар</button>
     <button class="tab-btn" id="tabRenames" onclick="switchTab('renames')">Обновлённые SKU <span class="tab-badge" id="renamesTabBadge" style="display:none">0</span></button>
+    <button class="tab-btn" id="tabBarcodes" onclick="switchTab('barcodes')">Дубли ШК <span class="tab-badge" id="barcodesTabBadge" style="display:none">0</span></button>
   </div>
 </header>
 
@@ -774,6 +795,17 @@ main{padding:18px 22px;max-width:1440px;margin:0 auto}
     </div>
   </div>
   <div id="renamesGrid"></div>
+</div>
+
+<!-- ══ ДУБЛИ ШТРИХКОДОВ VIEW ══ -->
+<div class="simple-view" id="barcodesView">
+  <div class="simple-view-header">
+    <div>
+      <div class="simple-view-title">Дубли штрихкодов</div>
+      <div class="simple-view-sub" id="barcodesViewSub">Штрихкоды, которые стоят у двух и более <b>основных</b> карточек</div>
+    </div>
+  </div>
+  <div id="barcodesGrid"></div>
 </div>
 
 <!-- ══ ДОБАВИТЬ ТОВАР VIEW ══ -->
@@ -1267,6 +1299,10 @@ function apply(){
   const giftCount = DATA.filter(r=>r&&r.main_sku!=='GIFT_MASK'&&r.ms_type==='Комплект'&&(r.components||[]).some(c=>giftPool.has(normName(parseComp(c).name)))).length;
   const gb = document.getElementById('giftTabBadge');
   if(gb){ gb.textContent=giftCount; gb.style.display=giftCount?'inline-block':'none'; }
+  // Barcode duplicates badge
+  const bcProbs = getBarcodeProblems().length;
+  const bcb = document.getElementById('barcodesTabBadge');
+  if(bcb){ bcb.textContent=bcProbs; bcb.style.display=bcProbs?'inline-block':'none'; }
 }
 
 function render(){
@@ -1712,15 +1748,16 @@ let _ckLoaded = false;
 let _ckData   = null; // {missing_in_vps, extra_in_vps, fresh_dups}
 
 function switchTab(tab){
-  const isMain  = tab==='main';
-  const isCheck = tab==='check';
-  const isAdd   = tab==='add';
-  const isNew   = tab==='new';
-  const isNocat = tab==='nocat';
-  const isGift  = tab==='gift';
-  ['tabMain','tabCheck','tabAdd','tabNew','tabNocat','tabRenames','tabGift'].forEach(id=>
+  const isMain     = tab==='main';
+  const isCheck    = tab==='check';
+  const isAdd      = tab==='add';
+  const isNew      = tab==='new';
+  const isNocat    = tab==='nocat';
+  const isGift     = tab==='gift';
+  const isBarcodes = tab==='barcodes';
+  ['tabMain','tabCheck','tabAdd','tabNew','tabNocat','tabRenames','tabGift','tabBarcodes'].forEach(id=>
     document.getElementById(id)?.classList.remove('active'));
-  const activeTab = {main:'tabMain',check:'tabCheck',add:'tabAdd',new:'tabNew',nocat:'tabNocat',renames:'tabRenames',gift:'tabGift'}[tab];
+  const activeTab = {main:'tabMain',check:'tabCheck',add:'tabAdd',new:'tabNew',nocat:'tabNocat',renames:'tabRenames',gift:'tabGift',barcodes:'tabBarcodes'}[tab];
   if(activeTab) document.getElementById(activeTab).classList.add('active');
   document.querySelector('main').style.display              = isMain  ? '' : 'none';
   document.getElementById('carouselSection').style.display  = isMain  ? '' : 'none';
@@ -1731,14 +1768,16 @@ function switchTab(tab){
   document.getElementById('nocatView').classList.toggle('show', isNocat);
   document.getElementById('renamesView').classList.toggle('show', tab==='renames');
   document.getElementById('giftView').classList.toggle('show', isGift);
+  document.getElementById('barcodesView').classList.toggle('show', isBarcodes);
   if(tab==='renames') renderRenamesView();
   if(isCheck){
     if(!_ckLoaded) loadComparison();
     else recomputeComparison();
   }
-  if(isNew)   renderNewView();
-  if(isNocat) renderNocatView(); // async, runs in background
-  if(isGift)  renderGiftView();
+  if(isNew)       renderNewView();
+  if(isNocat)     renderNocatView();
+  if(isGift)      renderGiftView();
+  if(isBarcodes)  renderBarcodeView();
   if(isAdd && !currentUser){ alert('Войдите для добавления товаров'); switchTab('main'); }
 }
 
@@ -1849,6 +1888,125 @@ async function replaceWithGiftMaskAndRefreshView(mainSku, compStr, btn){
   await replaceWithGiftMask(mainSku, compStr, btn);
   // После замены перерисовываем вкладку
   if(btn.textContent !== 'Ошибка') renderGiftView();
+}
+
+// ── Дубли штрихкодов ─────────────────────────────────────────────────────────────────
+function getBarcodeProblems(){
+  const isDopOf = new Set();
+  DATA.forEach(d => (d.dop_skus||[]).forEach(s => isDopOf.add(s)));
+  const bcMap = {};
+  DATA.forEach(d => {
+    const bcs = (d.ms_barcodes && d.ms_barcodes.length) ? d.ms_barcodes : (d.ms_barcode ? [d.ms_barcode] : []);
+    bcs.forEach(bc => {
+      bc = String(bc).trim();
+      if (!bc || bc.startsWith('200') || bc.startsWith('02')) return;
+      if (!bcMap[bc]) bcMap[bc] = [];
+      bcMap[bc].push(d);
+    });
+  });
+  return Object.entries(bcMap).filter(([, recs]) =>
+    recs.filter(r => !isDopOf.has(r.main_sku)).length >= 2
+  ).sort((a,b) => a[0].localeCompare(b[0]));
+}
+
+function renderBarcodeView(){
+  const grid   = document.getElementById('barcodesGrid');
+  const badge  = document.getElementById('barcodesTabBadge');
+  const problems = getBarcodeProblems();
+
+  if(badge){
+    badge.textContent = problems.length;
+    badge.style.display = problems.length ? '' : 'none';
+  }
+
+  if(!problems.length){
+    grid.innerHTML = '<div style="padding:32px;color:#888;text-align:center">Дублирующихся штрихкодов не найдено</div>';
+    return;
+  }
+
+  const isDopOf = new Set();
+  DATA.forEach(d => (d.dop_skus||[]).forEach(s => isDopOf.add(s)));
+
+  grid.innerHTML = problems.map(([bc, recs]) => {
+    const mains = recs.filter(r => !isDopOf.has(r.main_sku));
+    const cards = mains.map(rec => {
+      const allBcs = (rec.ms_barcodes && rec.ms_barcodes.length) ? [...rec.ms_barcodes] : (rec.ms_barcode ? [rec.ms_barcode] : []);
+      const bcChips = allBcs.map(b => {
+        const isConflict = b === bc;
+        return `<span class="bc-chip${isConflict ? ' bc-conflict' : ''}" data-bc="${b}" data-sku="${rec.main_sku}">
+          ${b}
+          ${isConflict ? `<button class="bc-del-btn" title="Удалить этот ШК" onclick="bcRemove(this,'${rec.main_sku}','${b}')">✕</button>` : ''}
+        </span>`;
+      }).join('');
+      const img = rec.image_url ? `<img src="${rec.image_url}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">` : `<div style="width:48px;height:48px;border-radius:6px;background:#eee;flex-shrink:0"></div>`;
+      return `<div class="bc-card">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          ${img}
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${rec.name||''}">${rec.name||rec.main_sku}</div>
+            <div style="font-size:11px;color:#888;margin-bottom:6px">${rec.main_sku}</div>
+            <div class="bc-chips">${bcChips}</div>
+            <div class="bc-add-row" id="bcadd_${rec.main_sku}" style="display:none">
+              <input class="bc-add-input" id="bcinput_${rec.main_sku}" type="text" placeholder="Новый штрихкод">
+              <button class="bc-add-ok" onclick="bcAdd('${rec.main_sku}')">Добавить</button>
+              <button class="bc-add-cancel" onclick="document.getElementById('bcadd_${rec.main_sku}').style.display='none'">Отмена</button>
+            </div>
+            <button class="bc-add-btn" onclick="document.getElementById('bcadd_${rec.main_sku}').style.display=''">+ ШК</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="bc-group">
+      <div class="bc-group-header">
+        <span class="bc-group-bc">${bc}</span>
+        <span class="bc-group-count">${mains.length} основных с этим ШК</span>
+      </div>
+      <div class="bc-group-cards">${cards}</div>
+    </div>`;
+  }).join('');
+}
+
+async function bcRemove(btn, sku, barcode){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await fetch('/products/api/action', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'edit_barcode', main_sku:sku, old_barcode:barcode, new_barcode:'', user:currentUser})});
+    const j = await r.json();
+    if(!r.ok || j.error){ alert('Ошибка: ' + (j.error||r.status)); btn.disabled=false; btn.textContent='✕'; return; }
+    const rec = DATA.find(d => d.main_sku===sku);
+    if(rec){
+      const bcs = (rec.ms_barcodes && rec.ms_barcodes.length) ? [...rec.ms_barcodes] : (rec.ms_barcode ? [rec.ms_barcode] : []);
+      const idx = bcs.indexOf(barcode);
+      if(idx!==-1) bcs.splice(idx,1);
+      rec.ms_barcodes = bcs;
+      rec.ms_barcode  = bcs[0]||'';
+    }
+    renderBarcodeView();
+  } catch(e){ alert('Сетевая ошибка: '+e); btn.disabled=false; btn.textContent='✕'; }
+}
+
+async function bcAdd(sku){
+  if(!currentUser){ alert('Войдите для редактирования'); return; }
+  const inp = document.getElementById('bcinput_'+sku);
+  const newBc = inp ? inp.value.trim() : '';
+  if(!newBc){ alert('Введите штрихкод'); return; }
+  inp.disabled = true;
+  try {
+    const r = await fetch('/products/api/action', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'edit_barcode', main_sku:sku, old_barcode:'', new_barcode:newBc, user:currentUser})});
+    const j = await r.json();
+    if(!r.ok || j.error){ alert('Ошибка: ' + (j.error||r.status)); inp.disabled=false; return; }
+    const rec = DATA.find(d => d.main_sku===sku);
+    if(rec){
+      const bcs = (rec.ms_barcodes && rec.ms_barcodes.length) ? [...rec.ms_barcodes] : (rec.ms_barcode ? [rec.ms_barcode] : []);
+      if(!bcs.includes(newBc)) bcs.push(newBc);
+      rec.ms_barcodes = bcs;
+      rec.ms_barcode  = bcs[0]||'';
+    }
+    renderBarcodeView();
+  } catch(e){ alert('Сетевая ошибка: '+e); inp.disabled=false; }
 }
 
 // ── Обновлённые SKU ──────────────────────────────────────────────────────────────────
