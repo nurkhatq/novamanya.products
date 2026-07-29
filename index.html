@@ -1966,15 +1966,24 @@ function renderBarcodeView(){
   }).join('');
 }
 
+async function bcApiCall(body){
+  let r, j;
+  try { r = await fetch('/products/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
+  catch(e){ throw new Error('Сетевая ошибка. Редактирование работает только на VPS: http://194.238.41.18/products/'); }
+  try { j = await r.json(); }
+  catch(e){ throw new Error('Сервер вернул не JSON. Откройте сайт через VPS: http://194.238.41.18/products/ (на Vercel нет API)'); }
+  if(j && j.error && j.error.includes('Unknown action'))
+    throw new Error('Flask не обновлён — попросите администратора перезапустить Flask на VPS.');
+  if(!r.ok || (j && j.error)) throw new Error(j?.error || r.status);
+  return j;
+}
+
 async function bcRemove(btn, sku, barcode){
   if(!currentUser){ alert('Войдите для редактирования'); return; }
   btn.disabled = true;
   btn.textContent = '…';
   try {
-    const r = await fetch('/products/api/action', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'edit_barcode', main_sku:sku, old_barcode:barcode, new_barcode:'', user:currentUser})});
-    const j = await r.json();
-    if(!r.ok || j.error){ alert('Ошибка: ' + (j.error||r.status)); btn.disabled=false; btn.textContent='✕'; return; }
+    await bcApiCall({action:'edit_barcode', main_sku:sku, old_barcode:barcode, new_barcode:'', user:currentUser});
     const rec = DATA.find(d => d.main_sku===sku);
     if(rec){
       const bcs = (rec.ms_barcodes && rec.ms_barcodes.length) ? [...rec.ms_barcodes] : (rec.ms_barcode ? [rec.ms_barcode] : []);
@@ -1984,7 +1993,7 @@ async function bcRemove(btn, sku, barcode){
       rec.ms_barcode  = bcs[0]||'';
     }
     renderBarcodeView();
-  } catch(e){ alert('Сетевая ошибка: '+e); btn.disabled=false; btn.textContent='✕'; }
+  } catch(e){ alert('Ошибка: '+e.message); btn.disabled=false; btn.textContent='✕'; }
 }
 
 async function bcAdd(sku){
@@ -1994,10 +2003,7 @@ async function bcAdd(sku){
   if(!newBc){ alert('Введите штрихкод'); return; }
   inp.disabled = true;
   try {
-    const r = await fetch('/products/api/action', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'edit_barcode', main_sku:sku, old_barcode:'', new_barcode:newBc, user:currentUser})});
-    const j = await r.json();
-    if(!r.ok || j.error){ alert('Ошибка: ' + (j.error||r.status)); inp.disabled=false; return; }
+    await bcApiCall({action:'edit_barcode', main_sku:sku, old_barcode:'', new_barcode:newBc, user:currentUser});
     const rec = DATA.find(d => d.main_sku===sku);
     if(rec){
       const bcs = (rec.ms_barcodes && rec.ms_barcodes.length) ? [...rec.ms_barcodes] : (rec.ms_barcode ? [rec.ms_barcode] : []);
@@ -2006,7 +2012,7 @@ async function bcAdd(sku){
       rec.ms_barcode  = bcs[0]||'';
     }
     renderBarcodeView();
-  } catch(e){ alert('Сетевая ошибка: '+e); inp.disabled=false; }
+  } catch(e){ alert('Ошибка: '+e.message); inp.disabled=false; }
 }
 
 // ── Обновлённые SKU ──────────────────────────────────────────────────────────────────
