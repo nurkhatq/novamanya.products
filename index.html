@@ -1896,6 +1896,8 @@ function getBarcodeProblems(){
   DATA.forEach(d => (d.dop_skus||[]).forEach(s => isDopOf.add(s)));
   const bcMap = {};
   DATA.forEach(d => {
+    // Пропускаем записи чей штрихкод унаследован от компонента — это не "свой" ШК
+    if (d.ms_barcode_from_component) return;
     const bcs = (d.ms_barcodes && d.ms_barcodes.length) ? d.ms_barcodes : (d.ms_barcode ? [d.ms_barcode] : []);
     bcs.forEach(bc => {
       bc = String(bc).trim();
